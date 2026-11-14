@@ -1,0 +1,2030 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LankaGrid C2 — Smart Low-Voltage (11kV-400V/230V) Digital Twin</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        c2: {
+                            bg: '#060a12',
+                            panel: '#0d1424',
+                            card: '#131d33',
+                            border: '#223254',
+                            accent: '#38bdf8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #060a12;
+            color: #e2e8f0;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0d1424;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #283a61;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #38bdf8;
+        }
+        /* Animated SVG Power Flow Particles */
+        @keyframes flowForward {
+            to { stroke-dashoffset: -24; }
+        }
+        @keyframes flowReverse {
+            to { stroke-dashoffset: 24; }
+        }
+        .flow-forward {
+            stroke-dasharray: 6 6;
+            animation: flowForward 0.65s linear infinite;
+        }
+        .flow-reverse {
+            stroke-dasharray: 6 6;
+            animation: flowReverse 0.55s linear infinite;
+        }
+        .flow-fault {
+            stroke-dasharray: 4 4;
+            animation: flowForward 0.2s linear infinite;
+        }
+        @keyframes pulseGlow {
+            0%, 100% { filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.75)); }
+            50% { filter: drop-shadow(0 0 14px rgba(239, 68, 68, 1)); }
+        }
+        .fault-glow {
+            animation: pulseGlow 0.9s infinite;
+        }
+        input[type="range"] {
+            accent-color: #38bdf8;
+        }
+        .grid-bg {
+            background-size: 24px 24px;
+            background-image: 
+                linear-gradient(to right, rgba(34, 50, 84, 0.28) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(34, 50, 84, 0.28) 1px, transparent 1px);
+        }
+        .node-hover:hover {
+            filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.55));
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-sky-500 selection:text-slate-950">
+
+    <!-- ================= TOP COMMAND & CONTROL HEADER ================= -->
+    <header class="bg-c2-panel border-b border-c2-border px-4 py-2.5 sticky top-0 z-30 shadow-xl">
+        <div class="max-w-[1920px] mx-auto flex flex-wrap items-center justify-between gap-3">
+            <!-- Brand & Live Frequency Status -->
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-sky-500/15 border border-sky-400/40 flex items-center justify-center text-sky-400 shadow-inner">
+                    <i class="fa-solid fa-bolt-lightning text-lg"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="font-bold text-sm md:text-base tracking-tight text-white">LANKAGRID-C2 <span class="text-sky-400 font-mono text-xs px-1.5 py-0.5 rounded bg-sky-500/10 border border-sky-500/30">LV DIGITAL TWIN</span></h1>
+                        <span id="systemStatusBadge" class="px-2 py-0.5 text-[11px] font-mono font-semibold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                            NOMINAL 50.00 Hz
+                        </span>
+                    </div>
+                    <p class="text-[11px] text-slate-400">11kV → 400V (3Φ) / 230V (1Φ) Unbalanced Δ-Y Radial Distribution • Bidirectional Solar & Tie-Recloser FLISR</p>
+                </div>
+            </div>
+
+            <!-- Multi-Page View Switcher Tabs -->
+            <nav class="flex items-center bg-c2-bg p-1 rounded-xl border border-c2-border text-xs font-medium">
+                <button onclick="switchPageTab('page-c2')" id="tab-page-c2" class="px-3 py-1.5 rounded-lg bg-sky-500 text-slate-950 font-semibold transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-network-wired"></i>
+                    <span>1. Live C2 Grid Twin</span>
+                </button>
+                <button onclick="switchPageTab('page-wiring')" id="tab-page-wiring" class="px-3 py-1.5 rounded-lg text-slate-300 hover:text-white transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-diagram-project"></i>
+                    <span>2. 3Φ Δ-Y Wiring & Architecture</span>
+                </button>
+                <button onclick="switchPageTab('page-flisr')" id="tab-page-flisr" class="px-3 py-1.5 rounded-lg text-slate-300 hover:text-white transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-stopwatch"></i>
+                    <span>3. Tie-Recloser FLISR & SAIFI/SAIDI Lab</span>
+                </button>
+            </nav>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center gap-2">
+                <button onclick="openSandboxVerification()" class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-semibold text-xs flex items-center gap-1.5 shadow-md transition">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <span>Test Fix in Twin Sandbox</span>
+                </button>
+                <button onclick="triggerMotorSurge()" id="motorSurgeBtn" class="px-3 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-400/40 font-mono text-xs flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-industry"></i>
+                    <span>Factory Motor Start (6x)</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Quick 6 Scenario Preset Pill Bar -->
+        <div class="max-w-[1920px] mx-auto mt-2 pt-2 border-t border-c2-border/70 flex flex-wrap items-center justify-between gap-2">
+            <div class="flex flex-wrap items-center gap-1.5">
+                <span class="text-[11px] font-mono uppercase tracking-wider text-slate-400 mr-1"><i class="fa-solid fa-bolt text-amber-400 mr-1"></i>6 Core Problem Presets:</span>
+                <button onclick="applyScenarioPreset('normal')" id="preset_normal" class="px-2.5 py-1 rounded-md text-xs font-mono border border-sky-400 bg-sky-500/20 text-sky-200 transition">(a) Normal Balanced</button>
+                <button onclick="applyScenarioPreset('solar_overvoltage')" id="preset_solar_overvoltage" class="px-2.5 py-1 rounded-md text-xs font-mono border border-c2-border bg-c2-card text-slate-300 hover:border-amber-400/60 transition">(b) Solar Overvoltage & Reverse Flow</button>
+                <button onclick="applyScenarioPreset('phase_imbalance')" id="preset_phase_imbalance" class="px-2.5 py-1 rounded-md text-xs font-mono border border-c2-border bg-c2-card text-slate-300 hover:border-rose-400/60 transition">(c) Phase Imbalance & Neutral Spike</button>
+                <button onclick="applyScenarioPreset('motor_startup')" id="preset_motor_startup" class="px-2.5 py-1 rounded-md text-xs font-mono border border-c2-border bg-c2-card text-slate-300 hover:border-indigo-400/60 transition">(d) Factory Motor Start Sag</button>
+                <button onclick="applyScenarioPreset('thermal_overload')" id="preset_thermal_overload" class="px-2.5 py-1 rounded-md text-xs font-mono border border-c2-border bg-c2-card text-slate-300 hover:border-orange-400/60 transition">(e) Evening Peak Thermal Overload</button>
+                <button onclick="applyScenarioPreset('fault_flisr')" id="preset_fault_flisr" class="px-2.5 py-1 rounded-md text-xs font-mono border border-c2-border bg-c2-card text-slate-300 hover:border-red-500/60 transition">(f) Bus A1 Fault → Tie-Recloser FLISR</button>
+            </div>
+            <div class="hidden xl:flex items-center gap-3 text-[11px] font-mono text-slate-400">
+                <span>Observability: <strong class="text-sky-400">3 ESP32 Physical + 2 PINN Virtual</strong></span>
+                <span>•</span>
+                <span>Statutory Band: <strong class="text-emerald-400">230V ± 6% (216.2V–243.8V)</strong></span>
+            </div>
+        </div>
+    </header>
+
+    <!-- ===================================================================== -->
+    <!-- PAGE 1: LIVE C2 GRID TWIN & INTERACTIVE SCHEMATIC WORKSPACE           -->
+    <!-- ===================================================================== -->
+    <main id="page-c2" class="flex-1 max-w-[1920px] w-full mx-auto p-3 grid grid-cols-1 lg:grid-cols-12 gap-3">
+
+        <!-- LEFT COLUMN: VOLTAGE CONTROL TOOLKIT & UNBALANCED LOAD/DER SLIDERS (3 COLS) -->
+        <section class="lg:col-span-3 flex flex-col gap-3">
+            
+            <!-- Card 1: Voltage Control Toolkit -->
+            <div class="bg-c2-panel border border-c2-border rounded-xl p-3.5 shadow-lg">
+                <div class="flex items-center justify-between mb-3 pb-2 border-b border-c2-border">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-sliders text-sky-400 text-sm"></i>
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-white">Voltage Control Toolkit</h2>
+                    </div>
+                    <button onclick="applyScenarioPreset('normal')" class="text-[11px] text-slate-400 hover:text-sky-400 font-mono">Reset Defaults</button>
+                </div>
+
+                <!-- 1. Substation On-Load Tap Changer (LTC) -->
+                <div class="mb-3">
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-slate-300 font-medium">1. Substation TX-A LTC Tap</span>
+                        <span id="ltcTapLabel" class="font-mono font-bold text-sky-400">0.00% (Tap 0)</span>
+                    </div>
+                    <input id="ltcTapSlider" type="range" min="-4" max="4" step="1" value="0" oninput="updateSimulationFromUI()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+                    <div class="flex justify-between text-[10px] font-mono text-slate-500 mt-0.5">
+                        <span>-5.0% (Buck)</span>
+                        <span>0% (230V)</span>
+                        <span>+5.0% (Boost)</span>
+                    </div>
+                </div>
+
+                <!-- 2. Mid-Feeder Line Voltage Regulator (LVR-A2) -->
+                <div class="mb-3">
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-slate-300 font-medium">2. Line Regulator (LVR @ 550m)</span>
+                        <span id="lvrTapLabel" class="font-mono font-bold text-sky-400">0.00% (Tap 0)</span>
+                    </div>
+                    <input id="lvrTapSlider" type="range" min="-4" max="4" step="1" value="0" oninput="updateSimulationFromUI()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+                    <div class="flex justify-between text-[10px] font-mono text-slate-500 mt-0.5">
+                        <span>-5.0%</span>
+                        <span>0%</span>
+                        <span>+5.0%</span>
+                    </div>
+                </div>
+
+                <!-- 3. Switched Shunt Capacitor Bank (0 to 75 kVAr at Bus A2) -->
+                <div class="mb-3">
+                    <div class="flex justify-between text-xs mb-1.5">
+                        <span class="text-slate-300 font-medium">3. Switched Capacitor Bank (A2)</span>
+                        <span id="capBankStatus" class="font-mono text-[11px] text-emerald-400">0 kVAr</span>
+                    </div>
+                    <div class="grid grid-cols-4 gap-1.5 font-mono text-xs">
+                        <button onclick="setCapBank(0)" id="capBtn0" class="py-1.5 rounded-lg border border-sky-400 bg-sky-500/20 text-sky-300 font-semibold transition">0</button>
+                        <button onclick="setCapBank(25)" id="capBtn25" class="py-1.5 rounded-lg border border-c2-border bg-c2-card text-slate-300 hover:border-slate-500 transition">+25</button>
+                        <button onclick="setCapBank(50)" id="capBtn50" class="py-1.5 rounded-lg border border-c2-border bg-c2-card text-slate-300 hover:border-slate-500 transition">+50</button>
+                        <button onclick="setCapBank(75)" id="capBtn75" class="py-1.5 rounded-lg border border-c2-border bg-c2-card text-slate-300 hover:border-slate-500 transition">+75</button>
+                    </div>
+                </div>
+
+                <!-- 4. DER Smart Inverter Volt/VAR Control -->
+                <div>
+                    <div class="flex items-center justify-between bg-c2-card p-2.5 rounded-lg border border-c2-border">
+                        <div>
+                            <div class="text-xs font-semibold text-white flex items-center gap-1.5">
+                                <i class="fa-solid fa-solar-panel text-amber-400"></i>
+                                <span>4. DER Inverter Volt/VAR</span>
+                            </div>
+                            <p class="text-[10px] text-slate-400">IEEE 1547 reactive Q absorption/injection</p>
+                        </div>
+                        <button id="voltVarToggleBtn" onclick="toggleVoltVar()" class="px-2.5 py-1 rounded-md font-mono text-xs font-bold bg-slate-700 text-slate-300 border border-slate-600 transition">
+                            OFF (PF=1)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2: Solar Irradiance, Domestic Loads & Phase Imbalance -->
+            <div class="bg-c2-panel border border-c2-border rounded-xl p-3.5 shadow-lg">
+                <div class="flex items-center justify-between mb-3 pb-2 border-b border-c2-border">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-sun text-amber-400 text-sm"></i>
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-white">Bidirectional DER & Feeder Loads</h2>
+                    </div>
+                    <span class="text-[10px] font-mono text-slate-400">50 Hz Radial</span>
+                </div>
+
+                <!-- Rooftop Solar Irradiance -->
+                <div class="mb-3">
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-slate-300"><i class="fa-solid fa-solar-panel text-amber-400 mr-1"></i>Rooftop Solar Irradiance</span>
+                        <span id="solarSliderVal" class="font-mono font-bold text-amber-400">35% (63 kW)</span>
+                    </div>
+                    <input id="solarSlider" type="range" min="0" max="100" step="5" value="35" oninput="updateSimulationFromUI()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+                </div>
+
+                <!-- 1-Phase Houses Demand -->
+                <div class="mb-3">
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-slate-300"><i class="fa-solid fa-house-chimney text-sky-400 mr-1"></i>1-Phase Houses Demand</span>
+                        <span id="houseLoadVal" class="font-mono font-bold text-sky-400">60% (72 kW)</span>
+                    </div>
+                    <input id="houseLoadSlider" type="range" min="15" max="150" step="5" value="60" oninput="updateSimulationFromUI()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+                </div>
+
+                <!-- 3-Phase Factory Load -->
+                <div class="mb-3">
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-slate-300"><i class="fa-solid fa-industry text-indigo-400 mr-1"></i>3-Phase Factory (400V)</span>
+                        <span id="factoryLoadVal" class="font-mono font-bold text-indigo-400">45 kW</span>
+                    </div>
+                    <input id="factoryLoadSlider" type="range" min="0" max="120" step="5" value="45" oninput="updateSimulationFromUI()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+                </div>
+
+                <!-- Phase Imbalance Skew -->
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-slate-300"><i class="fa-solid fa-scale-unbalanced text-rose-400 mr-1"></i>Phase R/Y/B Imbalance Skew</span>
+                        <span id="imbalanceVal" class="font-mono font-bold text-rose-400">15% Skew</span>
+                    </div>
+                    <input id="imbalanceSlider" type="range" min="0" max="100" step="5" value="15" oninput="updateSimulationFromUI()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+                    <p class="text-[10px] text-slate-400 mt-1">Skews PV export onto Phase R & heavy domestic load onto Phase B</p>
+                </div>
+            </div>
+
+            <!-- Card 3: 3-Phase Phasor & Neutral Return Current (I_N) Analyzer -->
+            <div class="bg-c2-panel border border-c2-border rounded-xl p-3.5 shadow-lg flex-1 flex flex-col">
+                <div class="flex items-center justify-between mb-2 pb-2 border-b border-c2-border">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-compass-drafting text-purple-400 text-sm"></i>
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-white">3Φ Phasor & Neutral Return ($I_N$)</h2>
+                    </div>
+                    <span id="powerDirectionBadge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30">FORWARD FLOW</span>
+                </div>
+
+                <!-- Phasor Diagram Canvas + Phase Bars -->
+                <div class="grid grid-cols-12 gap-2 items-center my-auto">
+                    <div class="col-span-5 flex flex-col items-center">
+                        <canvas id="phasorCanvas" width="130" height="130" class="w-[125px] h-[125px] bg-c2-bg rounded-full border border-c2-border"></canvas>
+                        <span class="text-[9px] font-mono text-slate-400 mt-1">Purple Vector = $I_N$</span>
+                    </div>
+                    <div class="col-span-7 space-y-1.5 text-xs font-mono">
+                        <div>
+                            <div class="flex justify-between text-[11px]">
+                                <span class="text-rose-400 font-semibold">Phase R (0°):</span>
+                                <span id="currRText" class="text-white">112.4 A</span>
+                            </div>
+                            <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div id="currRBar" class="h-full bg-rose-500 transition-all duration-300" style="width: 32%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-[11px]">
+                                <span class="text-amber-400 font-semibold">Phase Y (-120°):</span>
+                                <span id="currYText" class="text-white">128.0 A</span>
+                            </div>
+                            <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div id="currYBar" class="h-full bg-amber-400 transition-all duration-300" style="width: 36%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-[11px]">
+                                <span class="text-blue-400 font-semibold">Phase B (+120°):</span>
+                                <span id="currBText" class="text-white">142.6 A</span>
+                            </div>
+                            <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div id="currBBar" class="h-full bg-blue-500 transition-all duration-300" style="width: 40%"></div>
+                            </div>
+                        </div>
+                        <div class="pt-1 border-t border-c2-border/70">
+                            <div class="flex justify-between text-[11px]">
+                                <span class="text-purple-300 font-semibold">Neutral $I_N$:</span>
+                                <span id="currNText" class="text-purple-300 font-bold">24.8 A</span>
+                            </div>
+                            <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div id="currNBar" class="h-full bg-purple-500 transition-all duration-300" style="width: 14%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Mini KPI Row -->
+                <div class="grid grid-cols-3 gap-1.5 font-mono mt-3 pt-2 border-t border-c2-border/60 text-center">
+                    <div class="bg-c2-card p-1.5 rounded-lg border border-c2-border">
+                        <div class="text-[9px] text-slate-400">TX-A Load</div>
+                        <div id="txLoadingText" class="text-xs font-bold text-white">54.2%</div>
+                    </div>
+                    <div class="bg-c2-card p-1.5 rounded-lg border border-c2-border">
+                        <div class="text-[9px] text-slate-400">Hotspot Temp</div>
+                        <div id="txTempText" class="text-xs font-bold text-emerald-400">68.4 °C</div>
+                    </div>
+                    <div class="bg-c2-card p-1.5 rounded-lg border border-c2-border">
+                        <div class="text-[9px] text-slate-400">Unbalance VUF</div>
+                        <div id="vufText" class="text-xs font-bold text-sky-400">0.82%</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CENTER COLUMN: INTERACTIVE SINGLE-LINE TOPOLOGY & 0m-900m VOLTAGE DROP CHART (6 COLS) -->
+        <section class="lg:col-span-6 flex flex-col gap-3">
+            
+            <!-- Top Center: Interactive Single-Line & 3-Phase Topology Schematic -->
+            <div class="bg-c2-panel border border-c2-border rounded-xl p-3.5 shadow-lg flex flex-col">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2 pb-2 border-b border-c2-border">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span>
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-white">Interactive LV Distribution Topology (Radial Feeders A & B + Open Tie Recloser)</h2>
+                    </div>
+                    <div class="flex items-center gap-3 text-[11px] font-mono">
+                        <span class="flex items-center gap-1 text-sky-400"><span class="w-3 h-0.5 bg-sky-400 inline-block"></span> Grid→Load Flow</span>
+                        <span class="flex items-center gap-1 text-amber-400"><span class="w-3 h-0.5 bg-amber-400 inline-block"></span> Reverse Solar Flow</span>
+                        <span class="text-slate-400">(Click any Node to inspect • Click any Switch to toggle)</span>
+                    </div>
+                </div>
+
+                <!-- SVG Canvas -->
+                <div class="relative w-full bg-c2-bg grid-bg rounded-xl border border-c2-border overflow-hidden">
+                    <svg id="gridSvg" viewBox="0 0 920 435" class="w-full h-auto select-none">
+                        <!-- Distance Scale Ruler Along Feeder A -->
+                        <g transform="translate(0, 18)" class="opacity-75">
+                            <line x1="115" y1="0" x2="770" y2="0" stroke="#334155" stroke-width="1" stroke-dasharray="3 3"/>
+                            <text x="115" y="-4" text-anchor="middle" fill="#64748b" font-size="8.5" font-family="JetBrains Mono">0m (TX-A)</text>
+                            <text x="275" y="-4" text-anchor="middle" fill="#64748b" font-size="8.5" font-family="JetBrains Mono">250m (Z=0.08+j0.04Ω)</text>
+                            <text x="515" y="-4" text-anchor="middle" fill="#64748b" font-size="8.5" font-family="JetBrains Mono">550m (Z=0.11+j0.05Ω)</text>
+                            <text x="770" y="-4" text-anchor="middle" fill="#64748b" font-size="8.5" font-family="JetBrains Mono">900m Tail (Z=0.12+j0.06Ω)</text>
+                        </g>
+
+                        <!-- ================= FEEDER A BACKBONE LINES ================= -->
+                        <line id="line_A0_A1_bg" x1="115" y1="115" x2="275" y2="115" stroke="#1e293b" stroke-width="5"/>
+                        <line id="line_A0_A1" x1="115" y1="115" x2="275" y2="115" stroke="#38bdf8" stroke-width="3.5" class="flow-forward"/>
+
+                        <line id="line_A1_A2_bg" x1="275" y1="115" x2="515" y2="115" stroke="#1e293b" stroke-width="5"/>
+                        <line id="line_A1_A2" x1="275" y1="115" x2="515" y2="115" stroke="#38bdf8" stroke-width="3.5" class="flow-forward"/>
+
+                        <line id="line_A2_A3_bg" x1="515" y1="115" x2="770" y2="115" stroke="#1e293b" stroke-width="5"/>
+                        <line id="line_A2_A3" x1="515" y1="115" x2="770" y2="115" stroke="#38bdf8" stroke-width="3.5" class="flow-forward"/>
+
+                        <!-- ================= TIE RECLOSER LINE (BUS A3 <-> BUS B2) ================= -->
+                        <path id="line_TIE_bg" d="M 770 115 L 855 115 L 855 320 L 660 320" fill="none" stroke="#1e293b" stroke-width="5"/>
+                        <path id="line_TIE" d="M 770 115 L 855 115 L 855 320 L 660 320" fill="none" stroke="#475569" stroke-width="3.5" stroke-dasharray="4 4"/>
+
+                        <!-- ================= ADJACENT FEEDER B BACKBONE LINES ================= -->
+                        <line id="line_B0_B1_bg" x1="115" y1="320" x2="360" y2="320" stroke="#1e293b" stroke-width="5"/>
+                        <line id="line_B0_B1" x1="115" y1="320" x2="360" y2="320" stroke="#38bdf8" stroke-width="3.5" class="flow-forward"/>
+
+                        <line id="line_B1_B2_bg" x1="360" y1="320" x2="660" y2="320" stroke="#1e293b" stroke-width="5"/>
+                        <line id="line_B1_B2" x1="360" y1="320" x2="660" y2="320" stroke="#38bdf8" stroke-width="3.5" class="flow-forward"/>
+
+                        <!-- ================= SUBSTATION TX-A (11kV / 400V-230V + LTC) ================= -->
+                        <g onclick="inspectComponent('TX_A')" class="cursor-pointer node-hover" transform="translate(20, 62)">
+                            <rect x="0" y="0" width="95" height="106" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="2"/>
+                            <text x="47" y="18" text-anchor="middle" fill="#38bdf8" font-size="10" font-weight="bold" font-family="JetBrains Mono">TX-A (Δ-Y)</text>
+                            <text x="47" y="31" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="JetBrains Mono">11kV/400V</text>
+                            <circle cx="38" cy="54" r="13" fill="none" stroke="#38bdf8" stroke-width="2"/>
+                            <circle cx="56" cy="54" r="13" fill="none" stroke="#fbbf24" stroke-width="2"/>
+                            <line x1="42" y1="69" x2="66" y2="39" stroke="#f43f5e" stroke-width="1.8"/>
+                            <polygon points="66,39 60,41 64,45" fill="#f43f5e"/>
+                            <text id="svgLtcText" x="47" y="84" text-anchor="middle" fill="#fbbf24" font-size="9.5" font-family="JetBrains Mono" font-weight="bold">LTC: 0.0%</text>
+                            <text id="svgTxALoad" x="47" y="98" text-anchor="middle" fill="#34d399" font-size="9.5" font-family="JetBrains Mono">230.0V</text>
+                        </g>
+
+                        <!-- ================= BREAKER CB-A1 ================= -->
+                        <g id="sw_CB_A1" onclick="toggleSwitch('CB_A1')" class="cursor-pointer hover:opacity-80 transition" transform="translate(155, 97)">
+                            <rect x="0" y="0" width="46" height="34" rx="5" fill="#0f172a" stroke="#10b981" stroke-width="2" id="sw_CB_A1_box"/>
+                            <text x="23" y="13" text-anchor="middle" fill="#e2e8f0" font-size="8.5" font-family="JetBrains Mono" font-weight="bold">CB-A1</text>
+                            <text id="sw_CB_A1_txt" x="23" y="26" text-anchor="middle" fill="#10b981" font-size="8.5" font-family="JetBrains Mono" font-weight="bold">CLOSED</text>
+                        </g>
+
+                        <!-- ================= BUS A1: ZONE 1 HOUSES + ROOFTOP SOLAR + FAULT POINT ================= -->
+                        <g onclick="inspectComponent('BUS_A1')" class="cursor-pointer node-hover" transform="translate(275, 45)">
+                            <line x1="0" y1="35" x2="0" y2="155" stroke="#f8fafc" stroke-width="4" stroke-linecap="round"/>
+                            <circle cx="0" cy="70" r="5" fill="#38bdf8"/>
+                            <rect x="-48" y="8" width="96" height="22" rx="4" fill="#0c4a6e" stroke="#38bdf8" stroke-width="1"/>
+                            <text x="0" y="22" text-anchor="middle" fill="#7dd3fc" font-size="9" font-family="JetBrains Mono" font-weight="bold">BUS A1 [ESP32]</text>
+
+                            <rect x="-54" y="160" width="108" height="62" rx="6" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>
+                            <text x="0" y="174" text-anchor="middle" fill="#cbd5e1" font-size="9" font-weight="bold">1-Ph Houses + PV</text>
+                            <text id="svgBusA1_VR" x="-46" y="188" fill="#fb7185" font-size="9" font-family="JetBrains Mono">R:228.4V</text>
+                            <text id="svgBusA1_VY" x="4" y="188" fill="#fbbf24" font-size="9" font-family="JetBrains Mono">Y:228.1V</text>
+                            <text id="svgBusA1_VB" x="-46" y="201" fill="#60a5fa" font-size="9" font-family="JetBrains Mono">B:227.5V</text>
+                            <text id="svgBusA1_Net" x="4" y="201" fill="#34d399" font-size="8.5" font-family="JetBrains Mono">+14kW</text>
+                            <text id="svgBusA1_PV" x="0" y="215" text-anchor="middle" fill="#fbbf24" font-size="8.5" font-family="JetBrains Mono">☀ PV1: 20kW</text>
+
+                            <!-- Fault Indicator Icon -->
+                            <g id="svgFaultIndicator" class="hidden fault-glow" transform="translate(-22, 65)">
+                                <circle cx="22" cy="0" r="18" fill="#dc2626" stroke="#fef08a" stroke-width="2"/>
+                                <text x="22" y="5" text-anchor="middle" fill="#fef08a" font-size="14" font-weight="bold">⚡</text>
+                                <text x="22" y="-23" text-anchor="middle" fill="#f87171" font-size="9.5" font-family="JetBrains Mono" font-weight="bold">SHORT CIRCUIT</text>
+                            </g>
+                        </g>
+
+                        <!-- ================= SECTIONALIZER SEC-A1 & LVR REGULATOR ================= -->
+                        <g id="sw_SEC_A1" onclick="toggleSwitch('SEC_A1')" class="cursor-pointer hover:opacity-80 transition" transform="translate(335, 97)">
+                            <rect x="0" y="0" width="46" height="34" rx="5" fill="#0f172a" stroke="#10b981" stroke-width="1.8" id="sw_SEC_A1_box"/>
+                            <text x="23" y="13" text-anchor="middle" fill="#e2e8f0" font-size="8" font-family="JetBrains Mono" font-weight="bold">SEC-A1</text>
+                            <text id="sw_SEC_A1_txt" x="23" y="26" text-anchor="middle" fill="#10b981" font-size="8" font-family="JetBrains Mono" font-weight="bold">CLOSED</text>
+                        </g>
+
+                        <!-- Line Voltage Regulator Symbol on Feeder A -->
+                        <g onclick="inspectComponent('LVR_A2')" class="cursor-pointer node-hover" transform="translate(415, 93)">
+                            <rect x="0" y="0" width="54" height="42" rx="6" fill="#172554" stroke="#60a5fa" stroke-width="1.5"/>
+                            <text x="27" y="14" text-anchor="middle" fill="#93c5fd" font-size="8.5" font-family="JetBrains Mono" font-weight="bold">LVR-A2</text>
+                            <text id="svgLvrText" x="27" y="27" text-anchor="middle" fill="#fbbf24" font-size="9" font-family="JetBrains Mono" font-weight="bold">0.0%</text>
+                            <text x="27" y="38" text-anchor="middle" fill="#64748b" font-size="7.5" font-family="JetBrains Mono">REGULATOR</text>
+                        </g>
+
+                        <!-- ================= BUS A2: MID-FEEDER + CAPACITOR BANK + SOLAR CLUSTER (PINN INFERRED) ================= -->
+                        <g onclick="inspectComponent('BUS_A2')" class="cursor-pointer node-hover" transform="translate(515, 45)">
+                            <line x1="0" y1="35" x2="0" y2="155" stroke="#f8fafc" stroke-width="4" stroke-linecap="round"/>
+                            <circle cx="0" cy="70" r="5" fill="#a855f7"/>
+                            <rect x="-52" y="8" width="104" height="22" rx="4" fill="#3b0764" stroke="#c084fc" stroke-width="1"/>
+                            <text x="0" y="22" text-anchor="middle" fill="#e9d5ff" font-size="9" font-family="JetBrains Mono" font-weight="bold">BUS A2 [PINN-AI]</text>
+
+                            <rect x="-56" y="160" width="112" height="62" rx="6" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>
+                            <text x="0" y="174" text-anchor="middle" fill="#cbd5e1" font-size="9" font-weight="bold">Houses H3 + Cap</text>
+                            <text id="svgBusA2_VR" x="-48" y="188" fill="#fb7185" font-size="9" font-family="JetBrains Mono">R:227.2V</text>
+                            <text id="svgBusA2_VY" x="4" y="188" fill="#fbbf24" font-size="9" font-family="JetBrains Mono">Y:226.8V</text>
+                            <text id="svgBusA2_VB" x="-48" y="201" fill="#60a5fa" font-size="9" font-family="JetBrains Mono">B:225.4V</text>
+                            <text id="svgBusA2_Cap" x="4" y="201" fill="#38bdf8" font-size="8.5" font-family="JetBrains Mono">C:0kVAr</text>
+                            <text id="svgBusA2_PV" x="0" y="215" text-anchor="middle" fill="#fbbf24" font-size="8.5" font-family="JetBrains Mono">☀ PV2: 25kW</text>
+                        </g>
+
+                        <!-- ================= SECTIONALIZER SWITCH SEC-A2 ================= -->
+                        <g id="sw_SEC_A2" onclick="toggleSwitch('SEC_A2')" class="cursor-pointer hover:opacity-80 transition" transform="translate(615, 97)">
+                            <rect x="0" y="0" width="48" height="34" rx="5" fill="#0f172a" stroke="#10b981" stroke-width="1.8" id="sw_SEC_A2_box"/>
+                            <text x="24" y="13" text-anchor="middle" fill="#e2e8f0" font-size="8.5" font-family="JetBrains Mono" font-weight="bold">SEC-A2</text>
+                            <text id="sw_SEC_A2_txt" x="24" y="26" text-anchor="middle" fill="#10b981" font-size="8.5" font-family="JetBrains Mono" font-weight="bold">CLOSED</text>
+                        </g>
+
+                        <!-- ================= BUS A3: 3-PHASE FACTORY + TAIL HOUSES + SMART INVERTER ================= -->
+                        <g onclick="inspectComponent('BUS_A3')" class="cursor-pointer node-hover" transform="translate(770, 45)">
+                            <line x1="0" y1="35" x2="0" y2="155" stroke="#f8fafc" stroke-width="4" stroke-linecap="round"/>
+                            <circle cx="0" cy="70" r="5" fill="#38bdf8"/>
+                            <rect x="-50" y="8" width="100" height="22" rx="4" fill="#0c4a6e" stroke="#38bdf8" stroke-width="1"/>
+                            <text x="0" y="22" text-anchor="middle" fill="#7dd3fc" font-size="9" font-family="JetBrains Mono" font-weight="bold">BUS A3 [ESP32]</text>
+
+                            <rect x="-62" y="160" width="124" height="66" rx="6" fill="#0f172a" stroke="#6366f1" stroke-width="1.5"/>
+                            <text x="0" y="174" text-anchor="middle" fill="#a5b4fc" font-size="9" font-weight="bold">3Φ Factory + H4/H5</text>
+                            <text id="svgBusA3_VR" x="-54" y="188" fill="#fb7185" font-size="9" font-family="JetBrains Mono">R:225.8V</text>
+                            <text id="svgBusA3_VY" x="4" y="188" fill="#fbbf24" font-size="9" font-family="JetBrains Mono">Y:224.9V</text>
+                            <text id="svgBusA3_VB" x="-54" y="201" fill="#60a5fa" font-size="9" font-family="JetBrains Mono">B:222.8V</text>
+                            <text id="svgBusA3_Motor" x="4" y="201" fill="#818cf8" font-size="8.5" font-family="JetBrains Mono">3Φ:45kW</text>
+                            <text id="svgBusA3_DER" x="0" y="216" text-anchor="middle" fill="#fbbf24" font-size="8.5" font-family="JetBrains Mono">☀ PV3: 18kW (PF=1)</text>
+                        </g>
+
+                        <!-- ================= TIE RECLOSER (TIE-AB: NORMALLY OPEN) ================= -->
+                        <g id="sw_TIE_AB" onclick="toggleSwitch('TIE_AB')" class="cursor-pointer hover:opacity-90 transition" transform="translate(812, 200)">
+                            <rect x="0" y="0" width="84" height="44" rx="6" fill="#1e293b" stroke="#f59e0b" stroke-width="2" id="sw_TIE_AB_box"/>
+                            <text x="42" y="15" text-anchor="middle" fill="#fbbf24" font-size="9" font-family="JetBrains Mono" font-weight="bold">TIE-AB (NO)</text>
+                            <text id="sw_TIE_AB_txt" x="42" y="28" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="JetBrains Mono" font-weight="bold">OPEN (0.0A)</text>
+                            <text x="42" y="39" text-anchor="middle" fill="#64748b" font-size="7.5" font-family="JetBrains Mono">RECLOSER</text>
+                        </g>
+
+                        <!-- ================= SUBSTATION TX-B (ADJACENT FEEDER B) ================= -->
+                        <g onclick="inspectComponent('TX_B')" class="cursor-pointer node-hover" transform="translate(20, 272)">
+                            <rect x="0" y="0" width="95" height="96" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1.8"/>
+                            <text x="47" y="18" text-anchor="middle" fill="#34d399" font-size="10" font-weight="bold" font-family="JetBrains Mono">TX-B (Δ-Y)</text>
+                            <text x="47" y="31" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="JetBrains Mono">11kV/400V</text>
+                            <circle cx="38" cy="52" r="12" fill="none" stroke="#10b981" stroke-width="1.8"/>
+                            <circle cx="56" cy="52" r="12" fill="none" stroke="#38bdf8" stroke-width="1.8"/>
+                            <text id="svgTxBLoad" x="47" y="84" text-anchor="middle" fill="#34d399" font-size="9.5" font-family="JetBrains Mono">Load: 34%</text>
+                        </g>
+
+                        <!-- Breaker CB-B1 -->
+                        <g id="sw_CB_B1" onclick="toggleSwitch('CB_B1')" class="cursor-pointer hover:opacity-80 transition" transform="translate(155, 303)">
+                            <rect x="0" y="0" width="46" height="34" rx="5" fill="#0f172a" stroke="#10b981" stroke-width="1.8" id="sw_CB_B1_box"/>
+                            <text x="23" y="13" text-anchor="middle" fill="#e2e8f0" font-size="8.5" font-family="JetBrains Mono" font-weight="bold">CB-B1</text>
+                            <text id="sw_CB_B1_txt" x="23" y="26" text-anchor="middle" fill="#10b981" font-size="8.5" font-family="JetBrains Mono" font-weight="bold">CLOSED</text>
+                        </g>
+
+                        <!-- Bus B1 (Feeder B Mid) -->
+                        <g onclick="inspectComponent('BUS_A2')" class="cursor-pointer node-hover" transform="translate(360, 285)">
+                            <line x1="0" y1="15" x2="0" y2="65" stroke="#f8fafc" stroke-width="4" stroke-linecap="round"/>
+                            <circle cx="0" cy="35" r="4.5" fill="#c084fc"/>
+                            <text x="0" y="8" text-anchor="middle" fill="#cbd5e1" font-size="9" font-family="JetBrains Mono" font-weight="bold">BUS B1 [PINN]</text>
+                            <rect x="-48" y="70" width="96" height="44" rx="5" fill="#0f172a" stroke="#334155" stroke-width="1.2"/>
+                            <text x="0" y="84" text-anchor="middle" fill="#94a3b8" font-size="8.5">Houses H6 + PV</text>
+                            <text id="svgBusB1_V" x="0" y="102" text-anchor="middle" fill="#34d399" font-size="9.5" font-family="JetBrains Mono" font-weight="bold">228.6V Avg</text>
+                        </g>
+
+                        <!-- Bus B2 (Feeder B Tail - Tie Point) -->
+                        <g onclick="inspectComponent('TIE_AB')" class="cursor-pointer node-hover" transform="translate(660, 285)">
+                            <line x1="0" y1="15" x2="0" y2="65" stroke="#f8fafc" stroke-width="4" stroke-linecap="round"/>
+                            <circle cx="0" cy="35" r="4.5" fill="#38bdf8"/>
+                            <text x="0" y="8" text-anchor="middle" fill="#7dd3fc" font-size="9" font-family="JetBrains Mono" font-weight="bold">BUS B2 [ESP32]</text>
+                            <rect x="-52" y="70" width="104" height="44" rx="5" fill="#0f172a" stroke="#334155" stroke-width="1.2"/>
+                            <text x="0" y="84" text-anchor="middle" fill="#94a3b8" font-size="8.5">Houses H7 + PV4</text>
+                            <text id="svgBusB2_V" x="0" y="102" text-anchor="middle" fill="#34d399" font-size="9.5" font-family="JetBrains Mono" font-weight="bold">227.9V Avg</text>
+                        </g>
+                    </svg>
+
+                    <!-- Floating Alert Banner for Active Grid Violation -->
+                    <div id="violationBanner" class="hidden absolute bottom-2.5 left-3 right-3 bg-rose-950/95 border border-rose-500/70 text-rose-200 px-3 py-2 rounded-lg flex items-center justify-between text-xs shadow-xl backdrop-blur-md">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-triangle-exclamation text-rose-400 animate-bounce"></i>
+                            <span id="violationBannerText" class="font-mono font-medium">VIOLATION DETECTED</span>
+                        </div>
+                        <button onclick="openSandboxVerification()" class="px-2.5 py-1 rounded bg-rose-500 hover:bg-rose-400 text-slate-950 font-mono font-bold text-[11px] transition shrink-0 ml-2">
+                            Test Fix in Twin →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Interactive Component Inspector Bar -->
+                <div id="componentInspectorBar" class="mt-2.5 bg-c2-card/90 border border-c2-border rounded-lg px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 font-mono font-bold text-[11px]" id="inspTitle">TX-A (11kV/400V Δ-Y)</span>
+                        <span class="text-slate-300" id="inspDesc">250 kVA step-down transformer with On-Load Tap Changer (±5% range) and grounded neutral star point.</span>
+                    </div>
+                    <span class="font-mono text-[11px] text-amber-300" id="inspFormula">V_sec = V_nom × (1 + Tap%) - I·Z_tx</span>
+                </div>
+            </div>
+
+            <!-- Bottom Center: Live 3-Phase Voltage Drop Profile Chart (0m to 900m) -->
+            <div class="bg-c2-panel border border-c2-border rounded-xl p-3.5 shadow-lg flex-1 flex flex-col">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2 pb-2 border-b border-c2-border">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-chart-line text-sky-400 text-sm"></i>
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-white">Feeder Voltage Drop / Rise Profile vs. Distance (0m TX-A → 900m Bus A3)</h2>
+                    </div>
+                    <div class="flex items-center gap-3 text-[11px] font-mono">
+                        <span class="flex items-center gap-1 text-rose-400"><span class="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span> Phase R</span>
+                        <span class="flex items-center gap-1 text-amber-400"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span> Phase Y</span>
+                        <span class="flex items-center gap-1 text-blue-400"><span class="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span> Phase B</span>
+                        <span class="text-slate-400">Limits: 216.2V – 243.8V</span>
+                    </div>
+                </div>
+
+                <div class="relative w-full flex-1 min-h-[210px]">
+                    <canvas id="voltageChartCanvas" class="w-full h-full block"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- RIGHT COLUMN: RELIABILITY INDICES (SAIFI/SAIDI/CAIDI) & DSL SANDBOX (3 COLS) -->
+        <section class="lg:col-span-3 flex flex-col gap-3">
+            
+            <!-- Card 1: Reliability Indices (SAIFI, SAIDI/SAIPI, CAIDI/CAIPI) -->
+            <div class="bg-c2-panel border border-c2-border rounded-xl p-3.5 shadow-lg">
+                <div class="flex items-center justify-between mb-2.5 pb-2 border-b border-c2-border">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-chart-pie text-purple-400 text-sm"></i>
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-white">Reliability Indices (SAIFI / SAIPI / CAIPI)</h2>
+                    </div>
+                    <span class="text-[10px] font-mono text-purple-300 bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/30">N = 180 Cust</span>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2 font-mono mb-3">
+                    <div class="bg-c2-card p-2.5 rounded-lg border border-c2-border text-center">
+                        <div class="text-[10px] text-slate-400">SAIFI</div>
+                        <div id="saifiVal" class="text-base font-bold text-sky-400 mt-0.5">0.05</div>
+                        <div class="text-[9px] text-slate-500">int / cust</div>
+                    </div>
+                    <div class="bg-c2-card p-2.5 rounded-lg border border-c2-border text-center">
+                        <div class="text-[10px] text-slate-400">SAIDI / SAIPI</div>
+                        <div id="saidiVal" class="text-base font-bold text-emerald-400 mt-0.5">0.42</div>
+                        <div class="text-[9px] text-slate-500">min / cust</div>
+                    </div>
+                    <div class="bg-c2-card p-2.5 rounded-lg border border-c2-border text-center">
+                        <div class="text-[10px] text-slate-400">CAIDI / CAIPI</div>
+                        <div id="caidiVal" class="text-base font-bold text-amber-400 mt-0.5">8.40</div>
+                        <div class="text-[9px] text-slate-500">min / outage</div>
+                    </div>
+                </div>
+
+                <div class="bg-c2-card p-2.5 rounded-lg border border-c2-border text-xs mb-2">
+                    <div class="flex justify-between items-center mb-1.5">
+                        <span class="text-slate-300 font-semibold">Service Restoration Benchmark</span>
+                        <span id="outageCustomerBadge" class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">0 Interrupted</span>
+                    </div>
+                    <div class="space-y-1.5 font-mono text-[11px]">
+                        <div>
+                            <div class="flex justify-between text-slate-400">
+                                <span>Legacy Manual Crew:</span>
+                                <span id="legacySaidiTxt" class="text-rose-400">SAIDI: 58.0 min</span>
+                            </div>
+                            <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mt-0.5">
+                                <div class="h-full bg-rose-500" style="width: 92%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-slate-300">
+                                <span>Digital Twin Tie-Recloser:</span>
+                                <span id="twinSaidiTxt" class="text-emerald-400 font-bold">SAIDI: 0.42 min</span>
+                            </div>
+                            <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mt-0.5">
+                                <div id="twinSaidiBar" class="h-full bg-emerald-400 transition-all duration-300" style="width: 8%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button onclick="switchPageTab('page-flisr')" class="w-full py-1.5 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 font-mono text-[11px] transition">
+                    Open Full FLISR & Reliability Lab →
+                </button>
+            </div>
+
+            <!-- Card 2: Revel-Style Declarative Grid DSL & Pre-Flight Sandbox -->
+            <div class="bg-c2-panel border border-c2-border rounded-xl p-3.5 shadow-lg flex-1 flex flex-col">
+                <div class="flex items-center justify-between mb-2 pb-2 border-b border-c2-border">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-code text-amber-400 text-sm"></i>
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-white">LankaGrid-DSL & Pre-Flight Sandbox</h2>
+                    </div>
+                    <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">AST VERIFIED</span>
+                </div>
+
+                <div class="bg-slate-950 border border-c2-border rounded-lg p-2.5 font-mono text-[11px] text-slate-300 leading-relaxed overflow-x-auto mb-3 flex-1">
+                    <pre id="dslCodeDisplay" class="whitespace-pre-wrap"></pre>
+                </div>
+
+                <div class="bg-c2-card border border-c2-border rounded-lg p-2.5">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-sky-400">Pre-Execution Action Tester</span>
+                        <span id="sandboxSafetyBadge" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300">SANDBOX READY</span>
+                    </div>
+                    <p id="recommendedActionDesc" class="text-xs text-slate-300 mb-2.5">
+                        All feeder voltages (230V ± 6%) and phase currents are within statutory limits.
+                    </p>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="openSandboxVerification()" class="py-1.5 px-2 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-400/40 font-mono text-xs font-semibold transition flex items-center justify-center gap-1">
+                            <i class="fa-solid fa-vial"></i>
+                            <span>Simulate in Twin</span>
+                        </button>
+                        <button onclick="executeRecommendedAction()" id="applyActionBtn" class="py-1.5 px-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-mono text-xs font-bold transition flex items-center justify-center gap-1 shadow">
+                            <i class="fa-solid fa-bolt"></i>
+                            <span>Apply Verified Fix</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ===================================================================== -->
+    <!-- PAGE 2: 3-PHASE Δ-Y WIRING SCHEMATIC & DIGITAL TWIN ARCHITECTURE      -->
+    <!-- ===================================================================== -->
+    <section id="page-wiring" class="hidden flex-1 max-w-[1920px] w-full mx-auto p-4 space-y-4">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <!-- Left 7 Cols: Detailed 11kV -> 400V/230V 3-Phase 4-Wire Delta-Star Diagram -->
+            <div class="lg:col-span-7 bg-c2-panel border border-c2-border rounded-xl p-4 shadow-xl">
+                <div class="flex items-center justify-between pb-3 mb-3 border-b border-c2-border">
+                    <div>
+                        <h2 class="text-sm font-bold text-white uppercase tracking-wider"><i class="fa-solid fa-diagram-project text-sky-400 mr-1.5"></i>Physical 3-Phase 4-Wire ($\Delta\text{-Y}$) Domestic & Factory Wiring Schematic</h2>
+                        <p class="text-xs text-slate-400 mt-0.5">How 11kV steps down to 400V (Phase-to-Phase for 3Φ Factories) and 230V (Phase-to-Neutral for 1Φ Houses + Rooftop Solar)</p>
+                    </div>
+                    <span class="font-mono text-xs px-2.5 py-1 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30">V_LL = √3 · V_LN = 400V</span>
+                </div>
+
+                <!-- 4-Wire SVG Diagram -->
+                <div class="bg-c2-bg grid-bg rounded-xl border border-c2-border p-3 overflow-x-auto">
+                    <svg viewBox="0 0 820 360" class="w-full h-auto">
+                        <!-- 11kV Delta Primary Box -->
+                        <rect x="18" y="45" width="135" height="260" rx="10" fill="#0f172a" stroke="#38bdf8" stroke-width="2"/>
+                        <text x="85" y="70" text-anchor="middle" fill="#38bdf8" font-size="11" font-weight="bold" font-family="JetBrains Mono">11kV Δ-Y TX</text>
+                        <text x="85" y="86" text-anchor="middle" fill="#94a3b8" font-size="9.5" font-family="JetBrains Mono">250 kVA, 50Hz</text>
+                        <!-- Delta Symbol -->
+                        <polygon points="55,140 35,175 75,175" fill="none" stroke="#fbbf24" stroke-width="2.2"/>
+                        <text x="55" y="195" text-anchor="middle" fill="#fbbf24" font-size="9" font-family="JetBrains Mono">11kV Δ</text>
+                        <!-- Star (Y) Symbol -->
+                        <line x1="115" y1="158" x2="115" y2="180" stroke="#38bdf8" stroke-width="2.2"/>
+                        <line x1="115" y1="158" x2="100" y2="140" stroke="#f43f5e" stroke-width="2.2"/>
+                        <line x1="115" y1="158" x2="130" y2="140" stroke="#3b82f6" stroke-width="2.2"/>
+                        <text x="115" y="195" text-anchor="middle" fill="#38bdf8" font-size="9" font-family="JetBrains Mono">400V/230V Y</text>
+                        <text x="85" y="245" text-anchor="middle" fill="#34d399" font-size="9.5" font-family="JetBrains Mono">Neutral Grounded</text>
+                        <text x="85" y="262" text-anchor="middle" fill="#cbd5e1" font-size="9" font-family="JetBrains Mono">Substation LTC ±5%</text>
+
+                        <!-- 4 Horizontal Street Conductors (R, Y, B, N) -->
+                        <!-- Phase R (Red) -->
+                        <line x1="153" y1="80" x2="780" y2="80" stroke="#f43f5e" stroke-width="3.5"/>
+                        <text x="165" y="72" fill="#fb7185" font-size="10" font-family="JetBrains Mono" font-weight="bold">PHASE R (Live 1) — 230V to N</text>
+
+                        <!-- Phase Y (Yellow) -->
+                        <line x1="153" y1="145" x2="780" y2="145" stroke="#fbbf24" stroke-width="3.5"/>
+                        <text x="165" y="137" fill="#fcd34d" font-size="10" font-family="JetBrains Mono" font-weight="bold">PHASE Y (Live 2) — 230V to N</text>
+
+                        <!-- Phase B (Blue) -->
+                        <line x1="153" y1="210" x2="780" y2="210" stroke="#3b82f6" stroke-width="3.5"/>
+                        <text x="165" y="202" fill="#60a5fa" font-size="10" font-family="JetBrains Mono" font-weight="bold">PHASE B (Live 3) — 230V to N</text>
+
+                        <!-- Neutral N (Purple/Grey) -->
+                        <line x1="153" y1="275" x2="780" y2="275" stroke="#a855f7" stroke-width="3" stroke-dasharray="6 3"/>
+                        <text x="165" y="267" fill="#d8b4fe" font-size="10" font-family="JetBrains Mono" font-weight="bold">NEUTRAL WIRE (N) — Return Current I_N = |I_R + I_Y + I_B|</text>
+
+                        <!-- Tap 1: House 1 on Phase R + Neutral (230V 1-Phase + Solar) -->
+                        <circle cx="320" cy="80" r="5" fill="#f43f5e"/>
+                        <circle cx="335" cy="275" r="5" fill="#a855f7"/>
+                        <line x1="320" y1="80" x2="320" y2="305" stroke="#f43f5e" stroke-width="2"/>
+                        <line x1="335" y1="275" x2="335" y2="305" stroke="#a855f7" stroke-width="2"/>
+                        <rect x="265" y="305" width="125" height="46" rx="6" fill="#0f172a" stroke="#f43f5e" stroke-width="1.5"/>
+                        <text x="327" y="322" text-anchor="middle" fill="#fecdd3" font-size="9.5" font-weight="bold">House Cluster (Phase R)</text>
+                        <text x="327" y="338" text-anchor="middle" fill="#fbbf24" font-size="9" font-family="JetBrains Mono">230V 1Φ + Rooftop PV</text>
+
+                        <!-- Tap 2: House 2 on Phase B + Neutral (230V 1-Phase) -->
+                        <circle cx="490" cy="210" r="5" fill="#3b82f6"/>
+                        <circle cx="505" cy="275" r="5" fill="#a855f7"/>
+                        <line x1="490" y1="210" x2="490" y2="305" stroke="#3b82f6" stroke-width="2"/>
+                        <line x1="505" y1="275" x2="505" y2="305" stroke="#a855f7" stroke-width="2"/>
+                        <rect x="435" y="305" width="125" height="46" rx="6" fill="#0f172a" stroke="#3b82f6" stroke-width="1.5"/>
+                        <text x="497" y="322" text-anchor="middle" fill="#bfdbfe" font-size="9.5" font-weight="bold">House Cluster (Phase B)</text>
+                        <text x="497" y="338" text-anchor="middle" fill="#93c5fd" font-size="9" font-family="JetBrains Mono">230V 1Φ Heavy AC/EV</text>
+
+                        <!-- Tap 3: 3-Phase Factory connected across R, Y, B, N (400V Line-to-Line) -->
+                        <circle cx="665" cy="80" r="5" fill="#f43f5e"/>
+                        <circle cx="680" cy="145" r="5" fill="#fbbf24"/>
+                        <circle cx="695" cy="210" r="5" fill="#3b82f6"/>
+                        <circle cx="710" cy="275" r="5" fill="#a855f7"/>
+                        <line x1="665" y1="80" x2="665" y2="305" stroke="#f43f5e" stroke-width="2"/>
+                        <line x1="680" y1="145" x2="680" y2="305" stroke="#fbbf24" stroke-width="2"/>
+                        <line x1="695" y1="210" x2="695" y2="305" stroke="#3b82f6" stroke-width="2"/>
+                        <line x1="710" y1="275" x2="710" y2="305" stroke="#a855f7" stroke-width="2"/>
+                        <rect x="605" y="305" width="175" height="46" rx="6" fill="#0f172a" stroke="#818cf8" stroke-width="2"/>
+                        <text x="692" y="322" text-anchor="middle" fill="#c7d2fe" font-size="9.5" font-weight="bold">3-Phase Factory + Smart PV</text>
+                        <text x="692" y="338" text-anchor="middle" fill="#818cf8" font-size="9" font-family="JetBrains Mono">400V 3Φ Induction Motors</text>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Right 5 Cols: Mathematical Model & Hybrid PINN + DSL Architecture -->
+            <div class="lg:col-span-5 bg-c2-panel border border-c2-border rounded-xl p-4 shadow-xl flex flex-col justify-between space-y-3">
+                <div>
+                    <h2 class="text-sm font-bold text-white uppercase tracking-wider pb-2 mb-3 border-b border-c2-border">
+                        <i class="fa-solid fa-square-root-variable text-amber-400 mr-1.5"></i>Governing Mathematical Equations in the Twin
+                    </h2>
+                    <div class="space-y-2.5 text-xs">
+                        <div class="bg-c2-card p-3 rounded-lg border border-c2-border">
+                            <div class="font-bold text-sky-400 mb-1">1. Bidirectional Branch Voltage Drop / Rise ($\Delta V_\phi$)</div>
+                            <p class="font-mono text-[11px] text-slate-200 bg-slate-950 p-2 rounded border border-c2-border">
+                                V_{k,\phi} = V_{k-1,\phi} - [ R_{line}·(P_{load,\phi} - P_{PV,\phi}) + X_{line}·(Q_{load,\phi} \mp Q_{inv,\phi} - Q_{cap}) ] / V_{nom}
+                            </p>
+                            <p class="text-[11px] text-slate-400 mt-1">When rooftop solar export $P_{PV,\phi} > P_{load,\phi}$, power flows backward toward the transformer and raises $V_{k,\phi}$ above $230\text{V}$.</p>
+                        </div>
+
+                        <div class="bg-c2-card p-3 rounded-lg border border-c2-border">
+                            <div class="font-bold text-purple-400 mb-1">2. Phase Imbalance & Neutral Wire Current ($I_N$)</div>
+                            <p class="font-mono text-[11px] text-slate-200 bg-slate-950 p-2 rounded border border-c2-border">
+                                I_N = | I_R∠0° + I_Y∠-120° + I_B∠+120° | ,   VUF(%) = (max|V_\phi - V_{avg}| / V_{avg}) × 100
+                            </p>
+                            <p class="text-[11px] text-slate-400 mt-1">In a balanced 3-phase grid, $I_N = 0\text{ A}$. Single-phase houses and solar panels skew $I_R, I_Y, I_B$, driving high current through the neutral wire.</p>
+                        </div>
+
+                        <div class="bg-c2-card p-3 rounded-lg border border-c2-border">
+                            <div class="font-bold text-emerald-400 mb-1">3. Physics-Informed Neural Network (PINN) Virtual Sensing</div>
+                            <p class="font-mono text-[11px] text-slate-200 bg-slate-950 p-2 rounded border border-c2-border">
+                                L_{total} = λ_1 ||V_{ESP32} - \hat{V}||^2 + λ_2 ||\hat{I}_{bus} - Y_{bus}·\hat{V}||^2
+                            </p>
+                            <p class="text-[11px] text-slate-400 mt-1">Infers exact voltages at unmonitored intermediate poles (`Bus A2`, `Bus B1`) using only sparse ESP32 sensors + Kirchhoff's Current Law.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-sky-950/30 border border-sky-500/40 rounded-lg p-3 text-xs text-sky-200">
+                    <div class="font-bold mb-1"><i class="fa-solid fa-circle-check text-sky-400 mr-1"></i>Why Pre-Execution Sandbox Testing Matters:</div>
+                    <p class="text-[11px] text-slate-300">Closing a Tie Recloser or switching a 50 kVAr capacitor bank blindly on an unbalanced LV feeder can cause overvoltage or overload the adjacent transformer. The Digital Twin tests every action virtually first.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- PAGE 3: TIE-RECLOSER FLISR TIMELINE & SAIFI/SAIDI/CAIDI LAB           -->
+    <!-- ===================================================================== -->
+    <section id="page-flisr" class="hidden flex-1 max-w-[1920px] w-full mx-auto p-4 space-y-4">
+        <div class="bg-c2-panel border border-c2-border rounded-xl p-4 shadow-xl">
+            <div class="flex flex-wrap items-center justify-between gap-3 pb-3 mb-4 border-b border-c2-border">
+                <div>
+                    <h2 class="text-sm font-bold text-white uppercase tracking-wider"><i class="fa-solid fa-Bolt text-amber-400 mr-1.5"></i>Automated Fault Location, Isolation & Service Restoration (FLISR) via Open-Tie Recloser</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Step-by-step simulation of CEB protection clearing (120ms trip → 500ms dead-time → lockout) followed by Digital Twin Tie-Recloser back-feeding</p>
+                </div>
+                <button onclick="runInteractiveFlisrDemo()" class="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-mono text-xs font-bold shadow-lg transition flex items-center gap-2">
+                    <i class="fa-solid fa-play"></i>
+                    <span>Run Animated FLISR Sequence on Live Twin</span>
+                </button>
+            </div>
+
+            <!-- 5-Stage Protection & Restoration Timeline -->
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-3 mb-5 font-mono text-xs">
+                <div class="bg-c2-card p-3 rounded-xl border border-rose-500/40">
+                    <div class="text-rose-400 font-bold mb-1">Stage 1: t = 0 ms</div>
+                    <div class="text-white font-semibold mb-1">Fault Occurs @ Bus A1</div>
+                    <p class="text-[11px] text-slate-400 font-sans">Short-circuit on Bus A1 spikes current to 445 A and collapses Feeder A voltage.</p>
+                </div>
+                <div class="bg-c2-card p-3 rounded-xl border border-amber-500/40">
+                    <div class="text-amber-400 font-bold mb-1">Stage 2: t = 120 ms</div>
+                    <div class="text-white font-semibold mb-1">Shot 1 Trip & Dead-Time</div>
+                    <p class="text-[11px] text-slate-400 font-sans">Breaker CB-A1 trips in 120 ms and waits 500 ms arc de-ionization dead-time.</p>
+                </div>
+                <div class="bg-c2-card p-3 rounded-xl border border-orange-500/40">
+                    <div class="text-orange-400 font-bold mb-1">Stage 3: t = 740 ms</div>
+                    <div class="text-white font-semibold mb-1">Reclose & Lockout</div>
+                    <p class="text-[11px] text-slate-400 font-sans">CB-A1 recloses at 620 ms, detects persistent fault, and locks open at 740 ms (110 cust dark).</p>
+                </div>
+                <div class="bg-c2-card p-3 rounded-xl border border-sky-500/40">
+                    <div class="text-sky-400 font-bold mb-1">Stage 4: t = 1.2 s</div>
+                    <div class="text-white font-semibold mb-1">Twin Sandbox Check</div>
+                    <p class="text-[11px] text-slate-400 font-sans">Digital Twin tests opening SEC-A1 & closing Tie-Recloser TIE-AB in 4.2 ms virtual power flow.</p>
+                </div>
+                <div class="bg-c2-card p-3 rounded-xl border border-emerald-500/40">
+                    <div class="text-emerald-400 font-bold mb-1">Stage 5: t = 35 s</div>
+                    <div class="text-white font-semibold mb-1">Tie-Recloser Restoration</div>
+                    <p class="text-[11px] text-slate-400 font-sans">SEC-A1 opens & TIE-AB closes! 75 healthy customers on Buses A2 & A3 restored via TX-B.</p>
+                </div>
+            </div>
+
+            <!-- Reliability Indices Mathematical Breakdown Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse font-mono text-xs">
+                    <thead>
+                        <tr class="border-b border-c2-border text-slate-400 bg-c2-card/60">
+                            <th class="p-3">Reliability Metric</th>
+                            <th class="p-3">Mathematical Formula</th>
+                            <th class="p-3">Legacy Manual Grid (No Twin / Manual Crew)</th>
+                            <th class="p-3">Proposed Smart LV Digital Twin (Automated Tie-Recloser)</th>
+                            <th class="p-3">Improvement</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-c2-border/60">
+                        <tr>
+                            <td class="p-3 font-bold text-sky-400">SAIFI (Sustained Interruption Frequency)</td>
+                            <td class="p-3 text-slate-300">∑(Interrupted Customers) / N_total (180)</td>
+                            <td class="p-3 text-rose-400">110 / 180 = <strong>0.611 int/cust</strong></td>
+                            <td class="p-3 text-emerald-400">35 / 180 = <strong>0.194 int/cust</strong> (75 restored &lt;1 min)</td>
+                            <td class="p-3 text-emerald-300 font-bold">-68.2% Sustained Outages</td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 font-bold text-emerald-400">SAIDI / SAIPI (System Interruption Duration)</td>
+                            <td class="p-3 text-slate-300">∑(U_i × N_i) / N_total</td>
+                            <td class="p-3 text-rose-400">(110 × 95 min) / 180 = <strong>58.06 min/cust</strong></td>
+                            <td class="p-3 text-emerald-400">(35×22m + 75×0.6m) / 180 = <strong>4.52 min/cust</strong></td>
+                            <td class="p-3 text-emerald-300 font-bold">-92.2% Outage Minutes</td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 font-bold text-amber-400">CAIDI / CAIPI (Customer Restoration Duration)</td>
+                            <td class="p-3 text-slate-300">SAIDI / SAIFI</td>
+                            <td class="p-3 text-rose-400"><strong>95.00 min</strong> average wait</td>
+                            <td class="p-3 text-emerald-400"><strong>7.40 min</strong> weighted average</td>
+                            <td class="p-3 text-emerald-300 font-bold">12.8x Faster Recovery</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- ================= PRE-EXECUTION SANDBOX MODAL ================= -->
+    <div id="sandboxModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-c2-panel border border-sky-500/50 rounded-2xl max-w-2xl w-full p-5 shadow-2xl">
+            <div class="flex items-center justify-between pb-3 border-b border-c2-border mb-4">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-400">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-white">Digital Twin Pre-Execution Sandbox Verification</h3>
+                        <p class="text-[11px] text-slate-400 font-mono">Simulating candidate corrective action on virtual network clone before physical actuation</p>
+                    </div>
+                </div>
+                <button onclick="closeSandboxModal()" class="text-slate-400 hover:text-white text-lg px-2">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4 font-mono text-xs">
+                <div class="bg-c2-card p-3 rounded-xl border border-rose-500/40">
+                    <div class="text-rose-400 font-bold mb-2 flex items-center justify-between">
+                        <span>CURRENT PHYSICAL GRID STATE</span>
+                        <i class="fa-solid fa-circle-exclamation"></i>
+                    </div>
+                    <div id="sandboxBeforeStats" class="space-y-1.5 text-slate-300"></div>
+                </div>
+                <div class="bg-c2-card p-3 rounded-xl border border-emerald-500/40">
+                    <div class="text-emerald-400 font-bold mb-2 flex items-center justify-between">
+                        <span>POST-ACTION TWIN PREDICTION</span>
+                        <span class="px-1.5 py-0.5 text-[10px] rounded bg-emerald-500/20 text-emerald-300">VERIFIED SAFE</span>
+                    </div>
+                    <div id="sandboxAfterStats" class="space-y-1.5 text-slate-300"></div>
+                </div>
+            </div>
+
+            <div class="bg-slate-950 p-3 rounded-xl border border-c2-border mb-4">
+                <div class="text-[11px] font-mono text-sky-400 font-semibold mb-1">DSL Action Sequence Verified in 4.2 ms:</div>
+                <div id="sandboxActionSteps" class="text-xs font-mono text-slate-300"></div>
+            </div>
+
+            <div class="flex justify-end gap-2.5">
+                <button onclick="closeSandboxModal()" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium">Cancel</button>
+                <button onclick="executeRecommendedAction(); closeSandboxModal();" class="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-mono text-xs font-bold flex items-center gap-1.5 shadow-lg">
+                    <i class="fa-solid fa-check-double"></i>
+                    <span>Commit Verified Action to Live Grid</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= SIMULATION & PHYSICS ENGINE SCRIPT ================= -->
+    <script>
+        // --- 1. GLOBAL GRID STATE ---
+        const gridState = {
+            scenario: 'normal',
+            ltcTap: 0,           // -4 to +4 (each step = 1.25%, so -5% to +5%)
+            lvrTap: 0,           // -4 to +4 (each step = 1.25% at Bus A2)
+            capBankKvar: 0,      // 0, 25, 50, or 75 kVAr at Bus A2
+            voltVarActive: false,// IEEE 1547 Volt/VAR & Volt/Watt smart inverter control
+            solarPct: 35,        // 0% to 100%
+            houseLoadPct: 60,    // 15% to 150%
+            factoryLoadKw: 45,   // 0 to 120 kW
+            imbalancePct: 15,    // 0% to 100% phase skew
+            motorSurgeFactor: 1.0,
+            faultBusA1: false,
+            switches: {
+                CB_A1: 1,
+                SEC_A1: 1,
+                SEC_A2: 1,
+                TIE_AB: 0,       // Normally Open (0)
+                CB_B1: 1
+            }
+        };
+
+        let motorSurgeTimer = null;
+        let latestResults = null;
+
+        // --- 2. PAGE TAB SWITCHER ---
+        function switchPageTab(pageId) {
+            ['page-c2', 'page-wiring', 'page-flisr'].forEach(id => {
+                const pageEl = document.getElementById(id);
+                const tabEl = document.getElementById('tab-' + id);
+                if (id === pageId) {
+                    pageEl.classList.remove('hidden');
+                    tabEl.className = "px-3 py-1.5 rounded-lg bg-sky-500 text-slate-950 font-semibold transition flex items-center gap-1.5";
+                } else {
+                    pageEl.classList.add('hidden');
+                    tabEl.className = "px-3 py-1.5 rounded-lg text-slate-300 hover:text-white transition flex items-center gap-1.5";
+                }
+            });
+            if (pageId === 'page-c2' && latestResults) {
+                setTimeout(() => {
+                    drawVoltageProfileChart(latestResults);
+                    drawPhasorDiagram(latestResults);
+                }, 30);
+            }
+        }
+
+        function runInteractiveFlisrDemo() {
+            switchPageTab('page-c2');
+            applyScenarioPreset('fault_flisr');
+            setTimeout(() => {
+                openSandboxVerification();
+            }, 600);
+        }
+
+        // --- 3. COMPONENT INSPECTOR ---
+        const componentSpecs = {
+            TX_A: {
+                title: 'TX-A (11kV/400V-230V Δ-Y Transformer)',
+                desc: '250 kVA secondary unbalanced distribution transformer with On-Load Tap Changer (LTC ±5%) stepping 11kV down to 400V (3Φ) and 230V (1Φ).',
+                formula: 'V_A0 = 230V × (1 + LTC_Tap × 0.0125)'
+            },
+            BUS_A1: {
+                title: 'BUS A1 @ 250m [ESP32 Edge Sensor Node]',
+                desc: 'Monitored domestic cluster with single-phase houses tapped across Phases R, Y, B and 32% of feeder rooftop solar PV.',
+                formula: 'ΔV_01 = (P_01·R_1 + Q_01·X_1) / 230V'
+            },
+            LVR_A2: {
+                title: 'LVR-A2 @ 500m [Line Voltage Regulator]',
+                desc: 'Automatic step-voltage regulator compensating for mid-feeder voltage drop or reverse solar voltage rise.',
+                formula: 'V_out = V_in × (1 + LVR_Tap × 0.0125)'
+            },
+            BUS_A2: {
+                title: 'BUS A2 @ 550m [PINN-AI Virtual Sensor + Cap Bank]',
+                desc: 'Unmonitored node inferred in real time by the Physics-Informed Neural Network (1.1% RMSE). Hosts switched Capacitor Bank (0–75 kVAr) + PV2.',
+                formula: 'Q_net = Q_load - Q_cap - Q_DER'
+            },
+            BUS_A3: {
+                title: 'BUS A3 @ 900m Tail [3Φ Factory + Smart PV3 + ESP32]',
+                desc: 'Tail-end industrial & domestic bus with 400V 3-phase induction motors (inrush sag risk) and IEEE 1547 Volt/VAR solar inverters.',
+                formula: 'V_A3 = V_A2 - (P_23·R_3 + Q_23·X_3) / 230V'
+            },
+            TIE_AB: {
+                title: 'TIE-AB [Normally-Open Tie Recloser]',
+                desc: ' Automated boundary recloser linking Feeder A (Bus A3) and Feeder B (Bus B2) for sub-minute FLISR service restoration and overload sharing.',
+                formula: 'I_tie = s_tie · (V_B2 - V_A3) / Z_tie'
+            },
+            TX_B: {
+                title: 'TX-B (Adjacent Feeder B 11kV/400V Transformer)',
+                desc: '250 kVA adjacent substation transformer with reserve capacity to back-feed Bus A2 and Bus A3 when TIE-AB closes.',
+                formula: 'Reserve Margin = 250 kVA - S_FeederB'
+            }
+        };
+
+        function inspectComponent(key) {
+            const spec = componentSpecs[key];
+            if (!spec) return;
+            document.getElementById('inspTitle').textContent = spec.title;
+            document.getElementById('inspDesc').textContent = spec.desc;
+            document.getElementById('inspFormula').textContent = spec.formula;
+        }
+
+        // --- 4. UNBALANCED 3-PHASE RADIAL + TIE-RECLOSER SOLVER ---
+        function solveGridPhysics(state) {
+            const V_nom = 230.0;
+            const ltcRatio = 1.0 + (state.ltcTap * 0.0125);
+            const lvrRatio = 1.0 + (state.lvrTap * 0.0125);
+
+            const V_A0 = { R: V_nom * ltcRatio, Y: V_nom * ltcRatio, B: V_nom * ltcRatio };
+            const V_B0 = { R: 230.5, Y: 230.2, B: 229.8 };
+
+            const skew = state.imbalancePct / 100.0;
+            const solarTotalKw = (state.solarPct / 100.0) * 180.0;
+            const houseTotalKw = (state.houseLoadPct / 100.0) * 120.0;
+
+            const pvShareR = (1/3) + 0.42 * skew;
+            const pvShareY = (1/3) - 0.12 * skew;
+            const pvShareB = Math.max(0.05, 1.0 - pvShareR - pvShareY);
+
+            const loadShareR = Math.max(0.10, (1/3) - 0.22 * skew);
+            const loadShareY = (1/3);
+            const loadShareB = 1.0 - loadShareR - loadShareY;
+
+            const factoryP_perPhase = (state.factoryLoadKw / 3.0) * state.motorSurgeFactor;
+            const factoryQ_perPhase = (state.factoryLoadKw / 3.0) * 0.65 * Math.pow(state.motorSurgeFactor, 1.35);
+
+            let derQ_perPhase = { R: 0, Y: 0, B: 0 };
+            let solarCurtailFactor = 1.0;
+            if (state.voltVarActive) {
+                if (state.solarPct > 55) {
+                    derQ_perPhase.R = -16.0 * (state.solarPct / 100.0);
+                    derQ_perPhase.Y = -10.0 * (state.solarPct / 100.0);
+                    derQ_perPhase.B = -6.0 * (state.solarPct / 100.0);
+                    solarCurtailFactor = 0.86;
+                } else if (state.motorSurgeFactor > 1.3 || state.houseLoadPct > 100) {
+                    derQ_perPhase.R = +12.0;
+                    derQ_perPhase.Y = +12.0;
+                    derQ_perPhase.B = +14.0;
+                }
+            }
+
+            const P_A1 = {
+                R: 0.30 * houseTotalKw * loadShareR - 0.32 * solarTotalKw * pvShareR * solarCurtailFactor,
+                Y: 0.30 * houseTotalKw * loadShareY - 0.32 * solarTotalKw * pvShareY * solarCurtailFactor,
+                B: 0.30 * houseTotalKw * loadShareB - 0.32 * solarTotalKw * pvShareB * solarCurtailFactor
+            };
+            const P_A2 = {
+                R: 0.35 * houseTotalKw * loadShareR - 0.40 * solarTotalKw * pvShareR * solarCurtailFactor,
+                Y: 0.35 * houseTotalKw * loadShareY - 0.40 * solarTotalKw * pvShareY * solarCurtailFactor,
+                B: 0.35 * houseTotalKw * loadShareB - 0.40 * solarTotalKw * pvShareB * solarCurtailFactor
+            };
+            const P_A3 = {
+                R: 0.35 * houseTotalKw * loadShareR + factoryP_perPhase - 0.28 * solarTotalKw * pvShareR * solarCurtailFactor,
+                Y: 0.35 * houseTotalKw * loadShareY + factoryP_perPhase - 0.28 * solarTotalKw * pvShareY * solarCurtailFactor,
+                B: 0.35 * houseTotalKw * loadShareB + factoryP_perPhase - 0.28 * solarTotalKw * pvShareB * solarCurtailFactor
+            };
+
+            const capPerPhase = state.capBankKvar / 3.0;
+            const Q_A1 = { R: P_A1.R * 0.35, Y: P_A1.Y * 0.35, B: P_A1.B * 0.35 };
+            const Q_A2 = {
+                R: Math.max(0, P_A2.R) * 0.40 - capPerPhase - derQ_perPhase.R * 0.5,
+                Y: Math.max(0, P_A2.Y) * 0.40 - capPerPhase - derQ_perPhase.Y * 0.5,
+                B: Math.max(0, P_A2.B) * 0.40 - capPerPhase - derQ_perPhase.B * 0.5
+            };
+            const Q_A3 = {
+                R: Math.max(0, P_A3.R - factoryP_perPhase) * 0.40 + factoryQ_perPhase - derQ_perPhase.R,
+                Y: Math.max(0, P_A3.Y - factoryP_perPhase) * 0.40 + factoryQ_perPhase - derQ_perPhase.Y,
+                B: Math.max(0, P_A3.B - factoryP_perPhase) * 0.40 + factoryQ_perPhase - derQ_perPhase.B
+            };
+
+            const P_B1 = { R: 8.5, Y: 9.0, B: 9.5 };
+            const P_B2 = { R: 6.0 - 4.0 * (state.solarPct / 100), Y: 6.5 - 4.0 * (state.solarPct / 100), B: 7.0 - 4.0 * (state.solarPct / 100) };
+
+            const Z_A0_A1 = { R: 0.085, X: 0.042 };
+            const Z_A1_A2 = { R: 0.110, X: 0.055 };
+            const Z_A2_A3 = { R: 0.125, X: 0.062 };
+            const Z_B0_B1 = { R: 0.080, X: 0.040 };
+            const Z_B1_B2 = { R: 0.095, X: 0.045 };
+            const Z_TIE   = { R: 0.055, X: 0.028 };
+
+            const sw = state.switches;
+            const V_A1 = { R: 0, Y: 0, B: 0 };
+            const V_A2 = { R: 0, Y: 0, B: 0 };
+            const V_A3 = { R: 0, Y: 0, B: 0 };
+            const V_B1 = { R: 0, Y: 0, B: 0 };
+            const V_B2 = { R: 0, Y: 0, B: 0 };
+
+            ['R', 'Y', 'B'].forEach(ph => {
+                if (sw.CB_B1 === 1) {
+                    let extraTieP = 0, extraTieQ = 0;
+                    if (sw.TIE_AB === 1 && (sw.CB_A1 === 0 || sw.SEC_A1 === 0 || sw.SEC_A2 === 0)) {
+                        if (sw.SEC_A2 === 1 && sw.SEC_A1 === 0) {
+                            extraTieP = P_A3[ph] + P_A2[ph];
+                            extraTieQ = Q_A3[ph] + Q_A2[ph];
+                        } else {
+                            extraTieP = P_A3[ph];
+                            extraTieQ = Q_A3[ph];
+                        }
+                    }
+                    const p_b01 = P_B1[ph] + P_B2[ph] + extraTieP;
+                    const q_b01 = (P_B1[ph] + P_B2[ph]) * 0.35 + extraTieQ;
+                    V_B1[ph] = V_B0[ph] - (((p_b01 * 1000 * Z_B0_B1.R) + (q_b01 * 1000 * Z_B0_B1.X)) / V_nom);
+
+                    const p_b12 = P_B2[ph] + extraTieP;
+                    const q_b12 = P_B2[ph] * 0.35 + extraTieQ;
+                    V_B2[ph] = V_B1[ph] - (((p_b12 * 1000 * Z_B1_B2.R) + (q_b12 * 1000 * Z_B1_B2.X)) / V_nom);
+                }
+            });
+
+            ['R', 'Y', 'B'].forEach(ph => {
+                if (sw.CB_A1 === 1) {
+                    let p_flow_01 = P_A1[ph];
+                    let q_flow_01 = Q_A1[ph];
+                    if (sw.SEC_A1 === 1) {
+                        p_flow_01 += P_A2[ph];
+                        q_flow_01 += Q_A2[ph];
+                        if (sw.SEC_A2 === 1) {
+                            p_flow_01 += P_A3[ph];
+                            q_flow_01 += Q_A3[ph];
+                        }
+                    }
+                    const dV_01 = ((p_flow_01 * 1000 * Z_A0_A1.R) + (q_flow_01 * 1000 * Z_A0_A1.X)) / V_nom;
+                    V_A1[ph] = state.faultBusA1 ? 42.0 : (V_A0[ph] - dV_01);
+                }
+
+                if (sw.CB_A1 === 1 && sw.SEC_A1 === 1) {
+                    let p_flow_12 = P_A2[ph] + (sw.SEC_A2 === 1 ? P_A3[ph] : 0);
+                    let q_flow_12 = Q_A2[ph] + (sw.SEC_A2 === 1 ? Q_A3[ph] : 0);
+                    const dV_12 = ((p_flow_12 * 1000 * Z_A1_A2.R) + (q_flow_12 * 1000 * Z_A1_A2.X)) / V_nom;
+                    V_A2[ph] = (V_A1[ph] - dV_12) * lvrRatio;
+                } else if (sw.TIE_AB === 1 && sw.CB_B1 === 1 && sw.SEC_A2 === 1 && sw.SEC_A1 === 0) {
+                    const dV_tie = (((P_A3[ph] + P_A2[ph]) * 1000 * Z_TIE.R) + ((Q_A3[ph] + Q_A2[ph]) * 1000 * Z_TIE.X)) / V_nom;
+                    const v_a3_temp = V_B2[ph] - dV_tie;
+                    const dV_32 = ((P_A2[ph] * 1000 * Z_A2_A3.R) + (Q_A2[ph] * 1000 * Z_A2_A3.X)) / V_nom;
+                    V_A2[ph] = (v_a3_temp - dV_32) * lvrRatio;
+                }
+
+                if (sw.CB_A1 === 1 && sw.SEC_A1 === 1 && sw.SEC_A2 === 1) {
+                    const dV_23 = ((P_A3[ph] * 1000 * Z_A2_A3.R) + (Q_A3[ph] * 1000 * Z_A2_A3.X)) / V_nom;
+                    V_A3[ph] = V_A2[ph] - dV_23;
+                    if (sw.TIE_AB === 1 && sw.CB_B1 === 1) {
+                        V_A3[ph] = 0.62 * V_A3[ph] + 0.38 * V_B2[ph];
+                    }
+                } else if (sw.TIE_AB === 1 && sw.CB_B1 === 1) {
+                    const p_tie = P_A3[ph] + (sw.SEC_A2 === 1 && sw.SEC_A1 === 0 ? P_A2[ph] : 0);
+                    const q_tie = Q_A3[ph] + (sw.SEC_A2 === 1 && sw.SEC_A1 === 0 ? Q_A2[ph] : 0);
+                    const dV_tie = ((p_tie * 1000 * Z_TIE.R) + (q_tie * 1000 * Z_TIE.X)) / V_nom;
+                    V_A3[ph] = V_B2[ph] - dV_tie;
+                }
+            });
+
+            const I_phase = { R: 0, Y: 0, B: 0 };
+            const P_txA = { R: 0, Y: 0, B: 0 };
+            const Q_txA = { R: 0, Y: 0, B: 0 };
+
+            ['R', 'Y', 'B'].forEach(ph => {
+                if (sw.CB_A1 === 1) {
+                    if (state.faultBusA1) {
+                        I_phase[ph] = ph === 'R' ? 445.0 : 165.0;
+                        P_txA[ph] = 65.0;
+                    } else {
+                        P_txA[ph] = P_A1[ph] + (sw.SEC_A1 ? P_A2[ph] : 0) + (sw.SEC_A1 && sw.SEC_A2 ? P_A3[ph] : 0);
+                        Q_txA[ph] = Q_A1[ph] + (sw.SEC_A1 ? Q_A2[ph] : 0) + (sw.SEC_A1 && sw.SEC_A2 ? Q_A3[ph] : 0);
+                        if (sw.TIE_AB === 1 && sw.CB_B1 === 1) {
+                            P_txA[ph] *= 0.72;
+                            Q_txA[ph] *= 0.72;
+                        }
+                        const s_kva = Math.hypot(P_txA[ph], Q_txA[ph]);
+                        I_phase[ph] = (s_kva * 1000.0) / Math.max(180.0, V_A0[ph]);
+                    }
+                }
+            });
+
+            const iR_signed = I_phase.R * (P_txA.R >= 0 ? 1 : -1);
+            const iY_signed = I_phase.Y * (P_txA.Y >= 0 ? 1 : -1);
+            const iB_signed = I_phase.B * (P_txA.B >= 0 ? 1 : -1);
+
+            const realN = iR_signed + iY_signed * (-0.5) + iB_signed * (-0.5);
+            const imagN = iY_signed * (-0.866025) + iB_signed * (0.866025);
+            const I_neutral = Math.hypot(realN, imagN);
+
+            const totalP_txA = P_txA.R + P_txA.Y + P_txA.B;
+            const totalQ_txA = Q_txA.R + Q_txA.Y + Q_txA.B;
+            const totalS_kva = Math.hypot(totalP_txA, totalQ_txA);
+            const txLoadingPct = state.faultBusA1 && sw.CB_A1 ? 185.0 : (totalS_kva / 250.0) * 100.0;
+            const txTempC = 42.0 + 48.0 * Math.pow(txLoadingPct / 100.0, 1.6) + (I_neutral > 60 ? 8.5 : 0);
+
+            const vAvgA3 = (V_A3.R + V_A3.Y + V_A3.B) / 3.0;
+            const maxDevA3 = vAvgA3 > 50 ? Math.max(
+                Math.abs(V_A3.R - vAvgA3),
+                Math.abs(V_A3.Y - vAvgA3),
+                Math.abs(V_A3.B - vAvgA3)
+            ) : 0;
+            const vufPct = vAvgA3 > 50 ? (maxDevA3 / vAvgA3) * 100.0 : 0.0;
+
+            let tieCurrentA = 0;
+            if (sw.TIE_AB === 1 && sw.CB_B1 === 1) {
+                const p_tie_tot = P_A3.R + P_A3.Y + P_A3.B + (sw.SEC_A2 && !sw.SEC_A1 ? (P_A2.R + P_A2.Y + P_A2.B) : 0);
+                tieCurrentA = (Math.abs(p_tie_tot) * 1000) / (3 * 230.0);
+            }
+
+            const custCounts = {
+                A1: V_A1.R > 180 ? 0 : 35,
+                A2: V_A2.R > 180 ? 0 : 40,
+                A3: V_A3.R > 180 ? 0 : 35,
+                B:  V_B1.R > 180 ? 0 : 70
+            };
+            const interruptedCust = custCounts.A1 + custCounts.A2 + custCounts.A3 + custCounts.B;
+            const totalCust = 180;
+
+            let saifi = 0.05, saidi = 0.42, caidi = 8.40;
+            if (state.faultBusA1 || interruptedCust > 0) {
+                if (interruptedCust > 35) {
+                    saifi = interruptedCust / totalCust;
+                    saidi = (interruptedCust * 95.0) / totalCust;
+                    caidi = saidi / Math.max(0.01, saifi);
+                } else {
+                    saifi = 35 / totalCust;
+                    saidi = ((35 * 22.0) + (75 * 0.6)) / totalCust;
+                    caidi = saidi / Math.max(0.01, (110 / totalCust));
+                }
+            }
+
+            return {
+                V_A0, V_A1, V_A2, V_A3, V_B1, V_B2, V_B0,
+                P_A1, P_A2, P_A3, P_txA, totalP_txA, totalQ_txA,
+                I_phase, I_neutral, realN, imagN, iR_signed, iY_signed, iB_signed,
+                txLoadingPct, txTempC, vufPct, tieCurrentA,
+                interruptedCust, saifi, saidi, caidi
+            };
+        }
+
+        // --- 5. UI EVENT HANDLERS ---
+        function updateSimulationFromUI() {
+            gridState.ltcTap = parseInt(document.getElementById('ltcTapSlider').value, 10);
+            gridState.lvrTap = parseInt(document.getElementById('lvrTapSlider').value, 10);
+            gridState.solarPct = parseInt(document.getElementById('solarSlider').value, 10);
+            gridState.houseLoadPct = parseInt(document.getElementById('houseLoadSlider').value, 10);
+            gridState.factoryLoadKw = parseInt(document.getElementById('factoryLoadSlider').value, 10);
+            gridState.imbalancePct = parseInt(document.getElementById('imbalanceSlider').value, 10);
+            runAndRender();
+        }
+
+        function setCapBank(kvar) {
+            gridState.capBankKvar = kvar;
+            [0, 25, 50, 75].forEach(val => {
+                const btn = document.getElementById('capBtn' + val);
+                if (!btn) return;
+                if (val === kvar) {
+                    btn.className = "py-1.5 rounded-lg border border-sky-400 bg-sky-500/20 text-sky-300 font-semibold transition";
+                } else {
+                    btn.className = "py-1.5 rounded-lg border border-c2-border bg-c2-card text-slate-300 hover:border-slate-500 transition";
+                }
+            });
+            document.getElementById('capBankStatus').textContent = `+${kvar} kVAr`;
+            runAndRender();
+        }
+
+        function toggleVoltVar() {
+            gridState.voltVarActive = !gridState.voltVarActive;
+            const btn = document.getElementById('voltVarToggleBtn');
+            if (gridState.voltVarActive) {
+                btn.textContent = "ACTIVE (V/VAR)";
+                btn.className = "px-2.5 py-1 rounded-md font-mono text-xs font-bold bg-emerald-500/25 text-emerald-300 border border-emerald-400 transition";
+            } else {
+                btn.textContent = "OFF (PF=1)";
+                btn.className = "px-2.5 py-1 rounded-md font-mono text-xs font-bold bg-slate-700 text-slate-300 border border-slate-600 transition";
+            }
+            runAndRender();
+        }
+
+        function toggleSwitch(swName) {
+            gridState.switches[swName] = gridState.switches[swName] === 1 ? 0 : 1;
+            runAndRender();
+        }
+
+        function triggerMotorSurge() {
+            if (motorSurgeTimer) clearInterval(motorSurgeTimer);
+            gridState.motorSurgeFactor = 5.4;
+            const btn = document.getElementById('motorSurgeBtn');
+            btn.className = "px-3 py-1.5 rounded-lg bg-rose-600 text-white border border-rose-400 font-mono text-xs flex items-center gap-1.5 animate-pulse";
+            runAndRender();
+
+            motorSurgeTimer = setInterval(() => {
+                gridState.motorSurgeFactor = Math.max(1.0, gridState.motorSurgeFactor - 0.55);
+                runAndRender();
+                if (gridState.motorSurgeFactor <= 1.01) {
+                    gridState.motorSurgeFactor = 1.0;
+                    clearInterval(motorSurgeTimer);
+                    motorSurgeTimer = null;
+                    btn.className = "px-3 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-400/40 font-mono text-xs flex items-center gap-1.5 transition";
+                    runAndRender();
+                }
+            }, 300);
+        }
+
+        // --- 6. RENDER ALL TELEMETRY, SVG & CANVASES ---
+        function runAndRender() {
+            const res = solveGridPhysics(gridState);
+            latestResults = res;
+
+            const ltcPct = (gridState.ltcTap * 1.25).toFixed(2);
+            document.getElementById('ltcTapLabel').textContent = `${gridState.ltcTap >= 0 ? '+' : ''}${ltcPct}% (Tap ${gridState.ltcTap})`;
+            const lvrPct = (gridState.lvrTap * 1.25).toFixed(2);
+            document.getElementById('lvrTapLabel').textContent = `${gridState.lvrTap >= 0 ? '+' : ''}${lvrPct}% (Tap ${gridState.lvrTap})`;
+
+            const solarKw = Math.round((gridState.solarPct / 100) * 180);
+            document.getElementById('solarSliderVal').textContent = `${gridState.solarPct}% (${solarKw} kW)`;
+            const houseKw = Math.round((gridState.houseLoadPct / 100) * 120);
+            document.getElementById('houseLoadVal').textContent = `${gridState.houseLoadPct}% (${houseKw} kW)`;
+            document.getElementById('factoryLoadVal').textContent = `${Math.round(gridState.factoryLoadKw * gridState.motorSurgeFactor)} kW`;
+            document.getElementById('imbalanceVal').textContent = `${gridState.imbalancePct}% Skew`;
+
+            document.getElementById('currRText').textContent = `${res.I_phase.R.toFixed(1)} A ${res.P_txA.R < 0 ? '(Rev)' : ''}`;
+            document.getElementById('currYText').textContent = `${res.I_phase.Y.toFixed(1)} A ${res.P_txA.Y < 0 ? '(Rev)' : ''}`;
+            document.getElementById('currBText').textContent = `${res.I_phase.B.toFixed(1)} A ${res.P_txA.B < 0 ? '(Rev)' : ''}`;
+            document.getElementById('currNText').textContent = `${res.I_neutral.toFixed(1)} A`;
+
+            document.getElementById('currRBar').style.width = `${Math.min(100, (res.I_phase.R / 360) * 100)}%`;
+            document.getElementById('currYBar').style.width = `${Math.min(100, (res.I_phase.Y / 360) * 100)}%`;
+            document.getElementById('currBBar').style.width = `${Math.min(100, (res.I_phase.B / 360) * 100)}%`;
+            document.getElementById('currNBar').style.width = `${Math.min(100, (res.I_neutral / 180) * 100)}%`;
+
+            const txLoadEl = document.getElementById('txLoadingText');
+            txLoadEl.textContent = `${res.txLoadingPct.toFixed(1)}%`;
+            txLoadEl.className = `text-xs font-bold ${res.txLoadingPct > 100 ? 'text-rose-400' : res.txLoadingPct > 85 ? 'text-amber-400' : 'text-white'}`;
+
+            const txTempEl = document.getElementById('txTempText');
+            txTempEl.textContent = `${res.txTempC.toFixed(1)} °C`;
+            txTempEl.className = `text-xs font-bold ${res.txTempC > 95 ? 'text-rose-400' : res.txTempC > 80 ? 'text-amber-400' : 'text-emerald-400'}`;
+
+            const vufEl = document.getElementById('vufText');
+            vufEl.textContent = `${res.vufPct.toFixed(2)}%`;
+            vufEl.className = `text-xs font-bold ${res.vufPct > 2.0 ? 'text-rose-400' : 'text-sky-400'}`;
+
+            const dirBadge = document.getElementById('powerDirectionBadge');
+            if (res.totalP_txA < -2.0) {
+                dirBadge.textContent = `REVERSE SOLAR (${Math.abs(res.totalP_txA).toFixed(0)} kW ↑)`;
+                dirBadge.className = "text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40";
+            } else {
+                dirBadge.textContent = `FORWARD FLOW (+${res.totalP_txA.toFixed(0)} kW →)`;
+                dirBadge.className = "text-[10px] font-mono px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30";
+            }
+
+            // SVG Node Readouts
+            document.getElementById('svgLtcText').textContent = `LTC:${gridState.ltcTap >= 0 ? '+' : ''}${(gridState.ltcTap * 1.25).toFixed(1)}%`;
+            document.getElementById('svgTxALoad').textContent = `${res.V_A0.R.toFixed(1)}V`;
+            document.getElementById('svgLvrText').textContent = `${gridState.lvrTap >= 0 ? '+' : ''}${(gridState.lvrTap * 1.25).toFixed(1)}%`;
+
+            document.getElementById('svgBusA1_VR').textContent = `R:${res.V_A1.R.toFixed(1)}V`;
+            document.getElementById('svgBusA1_VY').textContent = `Y:${res.V_A1.Y.toFixed(1)}V`;
+            document.getElementById('svgBusA1_VB').textContent = `B:${res.V_A1.B.toFixed(1)}V`;
+            const netA1 = res.P_A1.R + res.P_A1.Y + res.P_A1.B;
+            document.getElementById('svgBusA1_Net').textContent = `${netA1 >= 0 ? '+' : ''}${netA1.toFixed(0)}kW`;
+            document.getElementById('svgBusA1_PV').textContent = `☀ PV1: ${Math.round(solarKw * 0.32)}kW`;
+
+            document.getElementById('svgBusA2_VR').textContent = `R:${res.V_A2.R.toFixed(1)}V`;
+            document.getElementById('svgBusA2_VY').textContent = `Y:${res.V_A2.Y.toFixed(1)}V`;
+            document.getElementById('svgBusA2_VB').textContent = `B:${res.V_A2.B.toFixed(1)}V`;
+            document.getElementById('svgBusA2_Cap').textContent = `C:${gridState.capBankKvar}kVAr`;
+            document.getElementById('svgBusA2_PV').textContent = `☀ PV2: ${Math.round(solarKw * 0.40)}kW`;
+
+            document.getElementById('svgBusA3_VR').textContent = `R:${res.V_A3.R.toFixed(1)}V`;
+            document.getElementById('svgBusA3_VY').textContent = `Y:${res.V_A3.Y.toFixed(1)}V`;
+            document.getElementById('svgBusA3_VB').textContent = `B:${res.V_A3.B.toFixed(1)}V`;
+            document.getElementById('svgBusA3_Motor').textContent = `3Φ:${Math.round(gridState.factoryLoadKw * gridState.motorSurgeFactor)}kW`;
+            document.getElementById('svgBusA3_DER').textContent = `☀ PV3: ${Math.round(solarKw * 0.28)}kW (${gridState.voltVarActive ? 'V/VAR ON' : 'PF=1'})`;
+
+            document.getElementById('svgBusB1_V').textContent = `${((res.V_B1.R + res.V_B1.Y + res.V_B1.B)/3).toFixed(1)}V Avg`;
+            document.getElementById('svgBusB2_V').textContent = `${((res.V_B2.R + res.V_B2.Y + res.V_B2.B)/3).toFixed(1)}V Avg`;
+
+            const faultInd = document.getElementById('svgFaultIndicator');
+            if (gridState.faultBusA1) faultInd.classList.remove('hidden');
+            else faultInd.classList.add('hidden');
+
+            updateSwitchSvg('CB_A1');
+            updateSwitchSvg('SEC_A1');
+            updateSwitchSvg('SEC_A2');
+            updateSwitchSvg('CB_B1');
+
+            const tieBox = document.getElementById('sw_TIE_AB_box');
+            const tieTxt = document.getElementById('sw_TIE_AB_txt');
+            const lineTie = document.getElementById('line_TIE');
+            if (gridState.switches.TIE_AB === 1) {
+                tieBox.setAttribute('stroke', '#10b981');
+                tieBox.setAttribute('fill', '#064e3b');
+                tieTxt.textContent = `CLOSED (${res.tieCurrentA.toFixed(0)}A)`;
+                tieTxt.setAttribute('fill', '#34d399');
+                lineTie.setAttribute('stroke', '#10b981');
+                lineTie.setAttribute('class', 'flow-reverse');
+            } else {
+                tieBox.setAttribute('stroke', '#f59e0b');
+                tieBox.setAttribute('fill', '#1e293b');
+                tieTxt.textContent = 'OPEN (0.0A)';
+                tieTxt.setAttribute('fill', '#94a3b8');
+                lineTie.setAttribute('stroke', '#475569');
+                lineTie.setAttribute('class', '');
+            }
+
+            stylePowerLine('line_A0_A1', gridState.switches.CB_A1 === 1, res.totalP_txA < -1.0, gridState.faultBusA1);
+            const flowA1A2Rev = (res.P_A2.R + res.P_A2.Y + res.P_A2.B) < -1.0;
+            stylePowerLine('line_A1_A2', gridState.switches.CB_A1 === 1 && gridState.switches.SEC_A1 === 1, flowA1A2Rev, false);
+            const a2a3Energized = (gridState.switches.CB_A1 && gridState.switches.SEC_A1 && gridState.switches.SEC_A2) || (gridState.switches.TIE_AB && gridState.switches.SEC_A2);
+            const flowA2A3Rev = (res.P_A3.R + res.P_A3.Y + res.P_A3.B) < -1.0 || (gridState.switches.TIE_AB === 1 && gridState.switches.SEC_A1 === 0);
+            stylePowerLine('line_A2_A3', a2a3Energized, flowA2A3Rev, false);
+
+            document.getElementById('saifiVal').textContent = res.saifi.toFixed(2);
+            document.getElementById('saidiVal').textContent = res.saidi.toFixed(2);
+            document.getElementById('caidiVal').textContent = res.caidi.toFixed(2);
+
+            const custBadge = document.getElementById('outageCustomerBadge');
+            if (res.interruptedCust > 0) {
+                custBadge.textContent = `${res.interruptedCust} Cust Interrupted`;
+                custBadge.className = "font-mono text-[10px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40";
+            } else {
+                custBadge.textContent = `0 Interrupted (100% Served)`;
+                custBadge.className = "font-mono text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300";
+            }
+            document.getElementById('twinSaidiTxt').textContent = `SAIDI: ${res.saidi.toFixed(2)} min`;
+            document.getElementById('twinSaidiBar').style.width = `${Math.min(100, Math.max(6, (res.saidi / 60) * 100))}%`;
+
+            evaluateViolationsAndDSL(res);
+            drawVoltageProfileChart(res);
+            drawPhasorDiagram(res);
+        }
+
+        function updateSwitchSvg(swId) {
+            const box = document.getElementById(`sw_${swId}_box`);
+            const txt = document.getElementById(`sw_${swId}_txt`);
+            if (gridState.switches[swId] === 1) {
+                box.setAttribute('stroke', '#10b981');
+                txt.textContent = 'CLOSED';
+                txt.setAttribute('fill', '#10b981');
+            } else {
+                box.setAttribute('stroke', '#f43f5e');
+                txt.textContent = 'OPEN';
+                txt.setAttribute('fill', '#f43f5e');
+            }
+        }
+
+        function stylePowerLine(lineId, isEnergized, isReverseFlow, isFaulted) {
+            const el = document.getElementById(lineId);
+            if (!isEnergized) {
+                el.setAttribute('stroke', '#334155');
+                el.setAttribute('class', '');
+            } else if (isFaulted) {
+                el.setAttribute('stroke', '#ef4444');
+                el.setAttribute('class', 'flow-fault');
+            } else if (isReverseFlow) {
+                el.setAttribute('stroke', '#f59e0b');
+                el.setAttribute('class', 'flow-reverse');
+            } else {
+                el.setAttribute('stroke', '#38bdf8');
+                el.setAttribute('class', 'flow-forward');
+            }
+        }
+
+        // --- 7. VIOLATION EVALUATOR & DSL GENERATOR ---
+        function evaluateViolationsAndDSL(res) {
+            const allV = [
+                res.V_A1.R, res.V_A1.Y, res.V_A1.B,
+                res.V_A2.R, res.V_A2.Y, res.V_A2.B,
+                res.V_A3.R, res.V_A3.Y, res.V_A3.B
+            ].filter(v => v > 10);
+
+            const maxV = allV.length ? Math.max(...allV) : 0;
+            const minV = allV.length ? Math.min(...allV) : 0;
+
+            const banner = document.getElementById('violationBanner');
+            const bannerTxt = document.getElementById('violationBannerText');
+            const topBadge = document.getElementById('systemStatusBadge');
+            const recDesc = document.getElementById('recommendedActionDesc');
+            const dslEl = document.getElementById('dslCodeDisplay');
+
+            let violationMsg = null;
+            let dslCode = '';
+            let recText = '';
+
+            if (gridState.faultBusA1 && (gridState.switches.CB_A1 === 1 || gridState.switches.TIE_AB === 0)) {
+                violationMsg = `SHORT-CIRCUIT FAULT @ BUS A1: ${res.interruptedCust} customers unserved! Isolate Bus A1 & close Tie-Recloser TIE-AB.`;
+                recText = "Isolate faulted Bus A1 (Open CB-A1 & SEC-A1) and close Tie Recloser TIE-AB to restore Bus A2 & Bus A3 from Feeder B.";
+                dslCode = `// FLISR Fault Isolation & Tie-Recloser Service Restoration
+contingency_rule Auto_FLISR_BusA1 {
+  when (Bus_A1.fault_current > 350A or Bus_A1.voltage < 80V)
+  propose_action {
+    open_breaker("CB_A1", "SEC_A1") // Isolate Bus A1
+    close_tie_recloser("TIE_AB")    // Back-feed A2 & A3 from TX-B
+  }
+  verify_in_twin {
+    require Bus_A2.voltage > 216.2V and TX_B.loading < 90%
+    require SAIDI_reduction > 85%
+  }
+}`;
+            } else if (maxV > 243.8) {
+                violationMsg = `OVERVOLTAGE VIOLATION: Peak Phase R voltage = ${maxV.toFixed(1)}V (> 243.8V limit) due to reverse rooftop solar flow.`;
+                recText = "Enable Smart Inverter Volt/VAR Q-absorption, step down Substation LTC tap (-2.5%), and switch off Capacitor Bank.";
+                dslCode = `// Bidirectional Solar Overvoltage Mitigation Rule
+voltage_rule Mitigate_Reverse_Solar_Rise {
+  when (max(Feeder_A.phase_R.voltage) == ${maxV.toFixed(1)}V > 243.8V)
+  propose_action {
+    enable_der_volt_var(mode = "IEEE_1547_Q_ABSORB")
+    set_ltc_tap(tx = "TX_A", tap = -2) // -2.5% buck
+    set_capacitor_bank(bus = "Bus_A2", kvar = 0)
+  }
+  verify_in_twin {
+    require all_buses.voltage between [216.2V, 243.8V]
+  }
+}`;
+            } else if (minV < 216.2) {
+                violationMsg = `UNDERVOLTAGE / SAG VIOLATION: Tail voltage dropped to ${minV.toFixed(1)}V (< 216.2V limit) at Bus A3.`;
+                recText = "Switch on +50 kVAr Capacitor Bank at Bus A2, boost Line Voltage Regulator (+3.75%), and enable DER reactive support.";
+                dslCode = `// Motor Start-Up Sag & Tail Undervoltage Support Rule
+voltage_rule Restore_Tail_Undervoltage {
+  when (min(Bus_A3.voltage) == ${minV.toFixed(1)}V < 216.2V)
+  propose_action {
+    set_capacitor_bank(bus = "Bus_A2", kvar = 50kVAr)
+    set_lvr_tap(bus = "Bus_A2", tap = +3) // +3.75% boost
+    enable_der_volt_var(mode = "REACTIVE_BOOST")
+  }
+  verify_in_twin {
+    require Bus_A3.voltage >= 220.0V and TX_A.loading < 95%
+  }
+}`;
+            } else if (res.txLoadingPct > 100.0) {
+                violationMsg = `TRANSFORMER OVERLOAD: TX-A at ${res.txLoadingPct.toFixed(1)}% (${res.txTempC.toFixed(1)}°C hotspot)! Risk of thermal breakdown.`;
+                recText = "Close Tie Recloser TIE-AB for parallel load sharing with TX-B, inject +75 kVAr at Bus A2, and boost LVR.";
+                dslCode = `// Thermal Overload & Parallel Tie Load-Sharing Rule
+thermal_rule Prevent_TXA_Burnout {
+  when (TX_A.loading == ${res.txLoadingPct.toFixed(1)}% > 100% or TX_A.temp > 90C)
+  propose_action {
+    close_tie_recloser("TIE_AB") // Share tail load with TX-B
+    set_capacitor_bank(bus = "Bus_A2", kvar = 75kVAr)
+    set_lvr_tap(bus = "Bus_A2", tap = +2)
+  }
+  verify_in_twin {
+    require TX_A.loading < 85% and all_buses.voltage >= 218V
+  }
+}`;
+            } else if (res.vufPct > 2.0 || res.I_neutral > 65.0) {
+                violationMsg = `PHASE IMBALANCE ALERT: Neutral Current I_N = ${res.I_neutral.toFixed(1)}A, VUF = ${res.vufPct.toFixed(2)}% (> 2.0% limit).`;
+                recText = "Rebalance single-phase domestic loads across R-Y-B phases (reduce skew to 10%) and activate DER Volt/VAR.";
+                dslCode = `// 3-Phase Unbalance & Neutral Overcurrent Protection Rule
+balance_rule Phase_Equilibrium_Guard {
+  when (TX_A.neutral_current == ${res.I_neutral.toFixed(1)}A > 65A or VUF > 2.0%)
+  propose_action {
+    rebalance_single_phase_laterals(target_skew = 10%)
+    enable_der_volt_var(phase = R, mode = "Q_ABSORB")
+  }
+  verify_in_twin {
+    require TX_A.neutral_current < 25A and VUF < 1.0%
+  }
+}`;
+            } else {
+                recText = "All feeder voltages (230V ± 6%), phase unbalance, and thermal limits are verified safe.";
+                dslCode = `// Active Runtime Monitoring — All Constraints Satisfied
+monitor_zone Feeder_A_400V (tx = 250kVA, nominal = 230V) {
+  status: NOMINAL_OPERATION
+  max_voltage: ${maxV.toFixed(1)}V (<= 243.8V limit)
+  min_voltage: ${minV.toFixed(1)}V (>= 216.2V limit)
+  neutral_current: ${res.I_neutral.toFixed(1)}A (VUF = ${res.vufPct.toFixed(2)}%)
+  saidi_index: ${res.saidi.toFixed(2)} min/customer
+}`;
+            }
+
+            dslEl.textContent = dslCode;
+            recDesc.textContent = recText;
+
+            if (violationMsg) {
+                banner.classList.remove('hidden');
+                bannerTxt.textContent = violationMsg;
+                topBadge.className = "px-2 py-0.5 text-[11px] font-mono font-semibold rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 flex items-center gap-1.5";
+                topBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span> VIOLATION ACTIVE`;
+            } else {
+                banner.classList.add('hidden');
+                topBadge.className = "px-2 py-0.5 text-[11px] font-mono font-semibold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5";
+                topBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> NOMINAL 50.00 Hz`;
+            }
+        }
+
+        // --- 8. SCENARIO PRESETS & PRE-FLIGHT SANDBOX ---
+        function applyScenarioPreset(preset) {
+            gridState.scenario = preset;
+            gridState.faultBusA1 = false;
+            gridState.motorSurgeFactor = 1.0;
+            gridState.switches = { CB_A1: 1, SEC_A1: 1, SEC_A2: 1, TIE_AB: 0, CB_B1: 1 };
+
+            const allPresets = ['normal', 'solar_overvoltage', 'phase_imbalance', 'motor_startup', 'thermal_overload', 'fault_flisr'];
+            allPresets.forEach(p => {
+                const btn = document.getElementById('preset_' + p);
+                if (!btn) return;
+                if (p === preset) {
+                    btn.className = "px-2.5 py-1 rounded-md text-xs font-mono border border-sky-400 bg-sky-500/20 text-sky-200 font-semibold transition";
+                } else {
+                    btn.className = "px-2.5 py-1 rounded-md text-xs font-mono border border-c2-border bg-c2-card text-slate-300 hover:border-slate-500 transition";
+                }
+            });
+
+            if (preset === 'normal') {
+                gridState.ltcTap = 0;
+                gridState.lvrTap = 0;
+                gridState.capBankKvar = 0;
+                gridState.voltVarActive = false;
+                gridState.solarPct = 35;
+                gridState.houseLoadPct = 60;
+                gridState.factoryLoadKw = 45;
+                gridState.imbalancePct = 15;
+            } else if (preset === 'solar_overvoltage') {
+                gridState.ltcTap = 1;
+                gridState.lvrTap = 1;
+                gridState.capBankKvar = 25;
+                gridState.voltVarActive = false;
+                gridState.solarPct = 100;
+                gridState.houseLoadPct = 20;
+                gridState.factoryLoadKw = 10;
+                gridState.imbalancePct = 55;
+            } else if (preset === 'phase_imbalance') {
+                gridState.ltcTap = 0;
+                gridState.lvrTap = 0;
+                gridState.capBankKvar = 0;
+                gridState.voltVarActive = false;
+                gridState.solarPct = 85;
+                gridState.houseLoadPct = 95;
+                gridState.factoryLoadKw = 35;
+                gridState.imbalancePct = 95;
+            } else if (preset === 'motor_startup') {
+                gridState.ltcTap = 0;
+                gridState.lvrTap = 0;
+                gridState.capBankKvar = 0;
+                gridState.voltVarActive = false;
+                gridState.solarPct = 15;
+                gridState.houseLoadPct = 85;
+                gridState.factoryLoadKw = 65;
+                gridState.imbalancePct = 20;
+                gridState.motorSurgeFactor = 3.2;
+            } else if (preset === 'thermal_overload') {
+                gridState.ltcTap = 0;
+                gridState.lvrTap = 0;
+                gridState.capBankKvar = 0;
+                gridState.voltVarActive = false;
+                gridState.solarPct = 0;
+                gridState.houseLoadPct = 145;
+                gridState.factoryLoadKw = 110;
+                gridState.imbalancePct = 35;
+            } else if (preset === 'fault_flisr') {
+                gridState.ltcTap = 0;
+                gridState.lvrTap = 0;
+                gridState.capBankKvar = 0;
+                gridState.voltVarActive = true;
+                gridState.solarPct = 40;
+                gridState.houseLoadPct = 65;
+                gridState.factoryLoadKw = 45;
+                gridState.imbalancePct = 15;
+                gridState.faultBusA1 = true;
+                gridState.switches.CB_A1 = 0;
+                gridState.switches.SEC_A1 = 1;
+                gridState.switches.SEC_A2 = 1;
+                gridState.switches.TIE_AB = 0;
+            }
+
+            syncSlidersToState();
+            runAndRender();
+        }
+
+        function computeProposedSandboxState() {
+            const proposed = JSON.parse(JSON.stringify(gridState));
+            let steps = [];
+
+            if (proposed.faultBusA1) {
+                proposed.switches.CB_A1 = 0;
+                proposed.switches.SEC_A1 = 0;
+                proposed.switches.SEC_A2 = 1;
+                proposed.switches.TIE_AB = 1;
+                proposed.lvrTap = 2;
+                steps.push("1. Open CB-A1 & Sectionalizer SEC-A1 to isolate permanent fault at Bus A1 (250m).");
+                steps.push("2. Close Tie Recloser TIE-AB to back-feed healthy Buses A2 & A3 (75 customers) from Feeder B.");
+                steps.push("3. Boost LVR-A2 tap (+2.5%) to support back-fed tail voltage.");
+            } else {
+                const curRes = solveGridPhysics(proposed);
+                const maxV = Math.max(curRes.V_A1.R, curRes.V_A2.R, curRes.V_A3.R);
+                const minV = Math.min(curRes.V_A3.R, curRes.V_A3.Y, curRes.V_A3.B);
+
+                if (maxV > 243.8) {
+                    proposed.voltVarActive = true;
+                    proposed.ltcTap = -2;
+                    proposed.lvrTap = -1;
+                    proposed.capBankKvar = 0;
+                    steps.push("1. Activate Smart Inverter IEEE 1547 Volt/VAR Q-absorption on Buses A1–A3.");
+                    steps.push("2. Step down Substation TX-A LTC Tap to -2 (-2.5%) and LVR to -1 (-1.25%).");
+                    steps.push("3. Disconnect Bus A2 Capacitor Bank (0 kVAr) to eliminate leading reactive rise.");
+                }
+                if (minV < 216.2 || proposed.motorSurgeFactor > 1.2) {
+                    proposed.capBankKvar = 50;
+                    proposed.lvrTap = 3;
+                    proposed.ltcTap = 2;
+                    proposed.voltVarActive = true;
+                    proposed.motorSurgeFactor = 1.0;
+                    steps.push("1. Switch on +50 kVAr Shunt Capacitor Bank at Bus A2 to supply motor reactive inrush.");
+                    steps.push("2. Boost Bus A2 Line Voltage Regulator (+3.75%) and TX-A LTC (+2.5%).");
+                    steps.push("3. Enable DER Inverter Volt/VAR capacitive support.");
+                }
+                if (curRes.txLoadingPct > 100.0) {
+                    proposed.switches.TIE_AB = 1;
+                    proposed.capBankKvar = 75;
+                    proposed.lvrTap = 2;
+                    steps.push("1. Close Tie Recloser TIE-AB to transfer tail load onto adjacent Transformer TX-B.");
+                    steps.push("2. Inject +75 kVAr at Bus A2 to reduce reactive current draw on TX-A.");
+                }
+                if (curRes.vufPct > 2.0 || curRes.I_neutral > 65.0) {
+                    proposed.imbalancePct = 10;
+                    proposed.voltVarActive = true;
+                    steps.push("1. Rebalance single-phase domestic lateral switches across R, Y, B phases (Skew → 10%).");
+                    steps.push("2. Enable Phase-Selective Smart Inverter Volt/VAR control.");
+                }
+                if (steps.length === 0) {
+                    proposed.voltVarActive = true;
+                    steps.push("1. Grid already within statutory bounds; enabling preventive Volt/VAR tracking.");
+                }
+            }
+            return { proposed, steps };
+        }
+
+        function openSandboxVerification() {
+            const curRes = solveGridPhysics(gridState);
+            const { proposed, steps } = computeProposedSandboxState();
+            const simRes = solveGridPhysics(proposed);
+
+            document.getElementById('sandboxBeforeStats').innerHTML = `
+                <div class="flex justify-between"><span>Bus A3 Voltages (R/Y/B):</span><span class="text-white">${curRes.V_A3.R.toFixed(1)}V / ${curRes.V_A3.Y.toFixed(1)}V / ${curRes.V_A3.B.toFixed(1)}V</span></div>
+                <div class="flex justify-between"><span>TX-A Loading & Temp:</span><span class="text-white">${curRes.txLoadingPct.toFixed(1)}% (${curRes.txTempC.toFixed(1)}°C)</span></div>
+                <div class="flex justify-between"><span>Neutral Current (I_N):</span><span class="text-white">${curRes.I_neutral.toFixed(1)} A (VUF ${curRes.vufPct.toFixed(2)}%)</span></div>
+                <div class="flex justify-between"><span>Unserved Customers:</span><span class="text-rose-400 font-bold">${curRes.interruptedCust} Cust (SAIDI: ${curRes.saidi.toFixed(2)}m)</span></div>
+            `;
+
+            document.getElementById('sandboxAfterStats').innerHTML = `
+                <div class="flex justify-between"><span>Bus A3 Voltages (R/Y/B):</span><span class="text-emerald-300 font-bold">${simRes.V_A3.R.toFixed(1)}V / ${simRes.V_A3.Y.toFixed(1)}V / ${simRes.V_A3.B.toFixed(1)}V</span></div>
+                <div class="flex justify-between"><span>TX-A Loading & Temp:</span><span class="text-emerald-300 font-bold">${simRes.txLoadingPct.toFixed(1)}% (${simRes.txTempC.toFixed(1)}°C)</span></div>
+                <div class="flex justify-between"><span>Neutral Current (I_N):</span><span class="text-emerald-300 font-bold">${simRes.I_neutral.toFixed(1)} A (VUF ${simRes.vufPct.toFixed(2)}%)</span></div>
+                <div class="flex justify-between"><span>Unserved Customers:</span><span class="text-emerald-300 font-bold">${simRes.interruptedCust} Cust (SAIDI: ${simRes.saidi.toFixed(2)}m)</span></div>
+            `;
+
+            document.getElementById('sandboxActionSteps').innerHTML = steps.map(s => `<div class="py-0.5">${s}</div>`).join('');
+
+            const modal = document.getElementById('sandboxModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeSandboxModal() {
+            const modal = document.getElementById('sandboxModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function executeRecommendedAction() {
+            const { proposed } = computeProposedSandboxState();
+            Object.assign(gridState, proposed);
+            syncSlidersToState();
+            runAndRender();
+        }
+
+        function syncSlidersToState() {
+            document.getElementById('ltcTapSlider').value = gridState.ltcTap;
+            document.getElementById('lvrTapSlider').value = gridState.lvrTap;
+            document.getElementById('solarSlider').value = gridState.solarPct;
+            document.getElementById('houseLoadSlider').value = gridState.houseLoadPct;
+            document.getElementById('factoryLoadSlider').value = gridState.factoryLoadKw;
+            document.getElementById('imbalanceSlider').value = gridState.imbalancePct;
+            setCapBank(gridState.capBankKvar);
+
+            const btn = document.getElementById('voltVarToggleBtn');
+            if (gridState.voltVarActive) {
+                btn.textContent = "ACTIVE (V/VAR)";
+                btn.className = "px-2.5 py-1 rounded-md font-mono text-xs font-bold bg-emerald-500/25 text-emerald-300 border border-emerald-400 transition";
+            } else {
+                btn.textContent = "OFF (PF=1)";
+                btn.className = "px-2.5 py-1 rounded-md font-mono text-xs font-bold bg-slate-700 text-slate-300 border border-slate-600 transition";
+            }
+        }
+
+        // --- 9. 3-PHASE PHASOR & NEUTRAL VECTOR GAUGE CANVAS ---
+        function drawPhasorDiagram(res) {
+            const canvas = document.getElementById('phasorCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const W = canvas.width;
+            const H = canvas.height;
+            const cx = W / 2;
+            const cy = H / 2;
+            const maxR = (W / 2) - 12;
+
+            ctx.clearRect(0, 0, W, H);
+
+            // Reference concentric circles & axes
+            ctx.strokeStyle = 'rgba(51, 65, 85, 0.55)';
+            ctx.lineWidth = 1;
+            [0.5, 0.9].forEach(r => {
+                ctx.beginPath();
+                ctx.arc(cx, cy, maxR * r, 0, Math.PI * 2);
+                ctx.stroke();
+            });
+
+            const scale = maxR / 260.0;
+            const drawVector = (x, y, color, width = 2.2) => {
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.lineTo(cx + x, cy - y);
+                ctx.strokeStyle = color;
+                ctx.lineWidth = width;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(cx + x, cy - y, 3, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.fill();
+            };
+
+            // Phase R (0 deg)
+            const rLen = Math.min(maxR, Math.abs(res.iR_signed) * scale);
+            drawVector(rLen * (res.iR_signed >= 0 ? 1 : -1), 0, '#f43f5e');
+
+            // Phase Y (-120 deg)
+            const yLen = Math.min(maxR, Math.abs(res.iY_signed) * scale);
+            const ySign = res.iY_signed >= 0 ? 1 : -1;
+            drawVector(yLen * (-0.5) * ySign, yLen * (-0.866) * ySign, '#fbbf24');
+
+            // Phase B (+120 deg)
+            const bLen = Math.min(maxR, Math.abs(res.iB_signed) * scale);
+            const bSign = res.iB_signed >= 0 ? 1 : -1;
+            drawVector(bLen * (-0.5) * bSign, bLen * (0.866) * bSign, '#3b82f6');
+
+            // Neutral Vector I_N (Phasor sum in Purple)
+            const nX = Math.max(-maxR, Math.min(maxR, res.realN * scale));
+            const nY = Math.max(-maxR, Math.min(maxR, res.imagN * scale));
+            drawVector(nX, nY, '#c084fc', 3.0);
+        }
+
+        // --- 10. HTML5 CANVAS 3-PHASE VOLTAGE PROFILE CHART (0m to 900m) ---
+        function drawVoltageProfileChart(res) {
+            const canvas = document.getElementById('voltageChartCanvas');
+            if (!canvas) return;
+            const rect = canvas.parentElement.getBoundingClientRect();
+            if (rect.width === 0) return;
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+
+            const W = rect.width;
+            const H = rect.height;
+            const padL = 48, padR = 24, padT = 18, padB = 34;
+            const plotW = W - padL - padR;
+            const plotH = H - padT - padB;
+
+            ctx.clearRect(0, 0, W, H);
+
+            const minV = 200.0;
+            const maxV = 255.0;
+            const yForV = (v) => {
+                const clamped = Math.max(minV, Math.min(maxV, v));
+                return padT + plotH - ((clamped - minV) / (maxV - minV)) * plotH;
+            };
+
+            const yUpper = yForV(243.8);
+            const yLower = yForV(216.2);
+
+            ctx.fillStyle = 'rgba(16, 185, 129, 0.06)';
+            ctx.fillRect(padL, yUpper, plotW, yLower - yUpper);
+
+            [205, 216.2, 230.0, 243.8, 252].forEach(v => {
+                const y = yForV(v);
+                ctx.beginPath();
+                ctx.moveTo(padL, y);
+                ctx.lineTo(W - padR, y);
+                if (v === 243.8 || v === 216.2) {
+                    ctx.strokeStyle = 'rgba(244, 63, 94, 0.65)';
+                    ctx.setLineDash([5, 4]);
+                    ctx.lineWidth = 1.3;
+                } else if (v === 230.0) {
+                    ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+                    ctx.setLineDash([3, 3]);
+                    ctx.lineWidth = 1;
+                } else {
+                    ctx.strokeStyle = 'rgba(34, 50, 84, 0.6)';
+                    ctx.setLineDash([]);
+                    ctx.lineWidth = 1;
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.fillStyle = (v === 243.8 || v === 216.2) ? '#fb7185' : '#94a3b8';
+                ctx.font = '10px JetBrains Mono';
+                ctx.textAlign = 'right';
+                ctx.fillText(`${v.toFixed(0)}V`, padL - 6, y + 3);
+            });
+
+            const nodes = [
+                { label: '0m TX-A', v: res.V_A0 },
+                { label: '250m Bus A1', v: res.V_A1 },
+                { label: '550m Bus A2', v: res.V_A2 },
+                { label: '900m Bus A3', v: res.V_A3 },
+                { label: 'Tie Bus B2', v: res.V_B2 },
+                { label: 'Feeder B1', v: res.V_B1 },
+                { label: 'Sub TX-B', v: res.V_B0 }
+            ];
+
+            const xForIdx = (i) => padL + (i / (nodes.length - 1)) * plotW;
+
+            nodes.forEach((n, i) => {
+                const x = xForIdx(i);
+                ctx.beginPath();
+                ctx.moveTo(x, padT);
+                ctx.lineTo(x, padT + plotH);
+                ctx.strokeStyle = 'rgba(34, 50, 84, 0.5)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                ctx.fillStyle = '#cbd5e1';
+                ctx.font = '10px JetBrains Mono';
+                ctx.textAlign = 'center';
+                ctx.fillText(n.label, x, H - 10);
+            });
+
+            const phases = [
+                { key: 'R', color: '#f43f5e' },
+                { key: 'Y', color: '#fbbf24' },
+                { key: 'B', color: '#3b82f6' }
+            ];
+
+            phases.forEach(ph => {
+                ctx.beginPath();
+                nodes.forEach((n, i) => {
+                    const x = xForIdx(i);
+                    const y = yForV(n.v[ph.key]);
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                });
+                ctx.strokeStyle = ph.color;
+                ctx.lineWidth = 2.4;
+                ctx.stroke();
+
+                nodes.forEach((n, i) => {
+                    const x = xForIdx(i);
+                    const val = n.v[ph.key];
+                    const y = yForV(val);
+                    ctx.beginPath();
+                    ctx.arc(x, y, 4, 0, Math.PI * 2);
+                    ctx.fillStyle = (val > 243.8 || val < 216.2) ? '#ef4444' : ph.color;
+                    ctx.fill();
+                    ctx.strokeStyle = '#060a12';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                });
+            });
+        }
+
+        window.addEventListener('resize', () => {
+            if (latestResults) {
+                drawVoltageProfileChart(latestResults);
+                drawPhasorDiagram(latestResults);
+            }
+        });
+
+        window.onload = () => {
+            applyScenarioPreset('normal');
+        };
+    </script>
+</body>
+</html>
