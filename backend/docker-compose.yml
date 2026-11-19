@@ -1,0 +1,16 @@
+services:
+  db:
+    image: timescale/timescaledb:2.31.0-pg18
+    container_name: smart-grid-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: smart_grid
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Missing POSTGRES_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - timescale_data:/var/lib/postgresql
+
+volumes:
+  timescale_data:
