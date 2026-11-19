@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+psycopg[binary]
+alembic
+firebase-admin
+pydantic
+pydantic-settings
+python-dotenv
+python-multipart
