@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard · LankaGrid</title>
+  <meta name="description" content="LankaGrid Digital Twin Operations dashboard.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="js/theme.js" defer></script>
+  <script type="module" src="js/guard.js"></script>
+  <script type="module" src="js/dashboard.js"></script>
+</head>
+<body>
+  <svg class="sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></symbol>
+  </svg>
+
+  <main class="auth-shell" id="dashboard-content" hidden>
+    <a class="skip-link" href="#dashboard-title">Skip to dashboard</a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Dark mode" aria-pressed="false" title="Toggle dark mode">
+      <svg class="icon i-moon" aria-hidden="true"><use href="#i-moon"/></svg>
+      <svg class="icon i-sun" aria-hidden="true"><use href="#i-sun"/></svg>
+    </button>
+
+    <div class="auth-card">
+      <aside class="hero hero--login">
+        <div class="brand">
+          <img class="brand-logo" src="assets/logo.svg" alt="">
+          <span class="brand-name">LankaGrid</span>
+        </div>
+        <p class="brand-sub">Digital Twin Operations Platform</p>
+
+        <div class="hero-copy">
+          <h2 class="hero-headline"><span>Smarter Grid.</span><span>A Resilient Sri Lanka.</span></h2>
+          <p class="hero-tagline">Monitor. Analyse. Simulate. Innovate.</p>
+        </div>
+      </aside>
+
+      <section class="form-panel" aria-labelledby="dashboard-title">
+        <div class="form-inner">
+          <header class="form-head">
+            <h1 class="form-title" id="dashboard-title">Dashboard</h1>
+            <div class="form">
+              <div class="alert" id="dashboard-alert" role="alert" hidden></div>
+              <p><strong id="user-name">Loading profile…</strong></p>
+              <p class="form-sub" id="user-email"></p>
+              <p>Role: <strong id="user-role">Loading…</strong></p>
+              <button class="btn btn-outline" type="button" id="signout-btn">
+                <span class="btn-label">Sign out</span>
+              </button>
+            </div>
+          </header>
+
+          <section class="form-foot" aria-labelledby="operations-title">
+            <h2 class="form-title" id="operations-title">Digital Twin Operations</h2>
+            <p class="form-sub">Operational tools and live grid insights will appear here.</p>
+          </section>
+        </div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

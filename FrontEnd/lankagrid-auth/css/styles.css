@@ -1,0 +1,835 @@
+/* ==========================================================================
+   LankaGrid – shared styles for index.html (login) and register.html
+   --------------------------------------------------------------------------
+   1. Design tokens (light + dark)
+   2. Base / reset
+   3. Page layout + card
+   4. Hero panel
+   5. Form panel + typography
+   6. Fields, inputs, icons
+   7. Checkbox, links, dividers, alerts
+   8. Buttons
+   9. Password strength + rules
+  10. Success state
+  11. Theme toggle
+  12. Responsive (mobile-first: ≥768px enhances)
+  13. Motion preferences
+   ========================================================================== */
+
+/* 1. TOKENS ---------------------------------------------------------------- */
+:root {
+  color-scheme: light;
+
+  --bg: #eef2fb;
+  --bg-glow: rgba(79, 70, 229, 0.1);
+  --surface: #ffffff;
+  --surface-2: #f3f5fb;
+  --text: #0f172a;
+  --text-muted: #566075;
+  --border: #cfd6e6;
+
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --primary-active: #3730a3;
+  --on-primary: #ffffff;
+  --link: #4338ca;
+  --ring-solid: #4f46e5;
+  --focus-ring: rgba(79, 70, 229, 0.3);
+
+  --danger: #c81e1e;
+  --danger-bg: #fdecec;
+  --success: #15803d;
+  --success-bg: #e8f7ee;
+  --warning: #b45309;
+
+  --shadow: 0 24px 50px -24px rgba(15, 23, 42, 0.35), 0 2px 6px rgba(15, 23, 42, 0.06);
+
+  --radius: 16px;
+  --radius-sm: 10px;
+  --font: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #0b1020;
+  --bg-glow: rgba(79, 70, 229, 0.22);
+  --surface: #121a30;
+  --surface-2: #1a2340;
+  --text: #e8ecf8;
+  --text-muted: #a3aecb;
+  --border: #2b3658;
+
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --primary-active: #3730a3;
+  --link: #9fadff;
+  --ring-solid: #a5b4fc;
+  --focus-ring: rgba(129, 140, 248, 0.45);
+
+  --danger: #f87171;
+  --danger-bg: rgba(248, 113, 113, 0.12);
+  --success: #4ade80;
+  --success-bg: rgba(74, 222, 128, 0.12);
+  --warning: #fbbf24;
+
+  --shadow: 0 28px 60px -24px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+/* 2. BASE ------------------------------------------------------------------ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font);
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--text);
+  background-color: var(--bg);
+  background-image: radial-gradient(circle at 15% 0%, var(--bg-glow), transparent 45%),
+    radial-gradient(circle at 90% 100%, var(--bg-glow), transparent 40%);
+  background-attachment: fixed;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring-solid);
+  outline-offset: 2px;
+}
+
+/* Visually hidden but available to assistive tech */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: 16px;
+  top: -60px;
+  z-index: 100;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+.skip-link:focus {
+  top: 16px;
+}
+
+/* SVG icon sprite container (kept in the DOM, not displayed) */
+.sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.icon {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 3. LAYOUT + CARD --------------------------------------------------------- */
+.auth-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 72px 16px 32px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 1000px;
+  display: grid;
+  grid-template-columns: 1fr; /* mobile: stacked */
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  animation: rise 0.4s ease both;
+}
+
+/* 4. HERO PANEL ------------------------------------------------------------ */
+.hero {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-height: 130px; /* slim banner on mobile */
+  padding: 20px 24px;
+  color: #ffffff;
+  background-color: #0b1020;
+  background-size: cover;
+  background-position: center 30%;
+  background-repeat: no-repeat;
+}
+
+.hero--login {
+  background-image: url("../assets/tower-sunset.svg");
+}
+.hero--register {
+  background-image: url("../assets/tower-wireframe.svg");
+  min-height: 110px;
+}
+
+/* Dark gradient overlay keeps white text readable on any image */
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    180deg,
+    rgba(11, 16, 32, 0.78) 0%,
+    rgba(11, 16, 32, 0.3) 50%,
+    rgba(11, 16, 32, 0.5) 100%
+  );
+}
+.hero--register::before {
+  background: linear-gradient(180deg, rgba(10, 18, 48, 0.35), rgba(10, 18, 48, 0.1));
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.brand-logo {
+  width: 40px;
+  height: 40px;
+}
+.brand-name {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.brand-sub {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
+}
+
+/* Headline + tagline are hidden on the mobile banner */
+.hero-copy {
+  display: none;
+}
+.hero-headline {
+  font-size: clamp(1.75rem, 3.4vw, 2.3rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.45);
+}
+.hero-headline span {
+  display: block;
+}
+.hero-tagline {
+  margin-top: 14px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
+}
+
+/* 5. FORM PANEL + TYPOGRAPHY ---------------------------------------------- */
+.form-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 32px 24px 28px;
+  background: var(--surface);
+}
+.form-inner {
+  width: 100%;
+  max-width: 380px;
+  margin-inline: auto;
+}
+
+.form-head {
+  margin-bottom: 24px;
+}
+.form-head--center {
+  text-align: center;
+}
+.form-head .brand-logo {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 12px;
+}
+.form-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+.form-sub {
+  margin-top: 4px;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+.form {
+  display: grid;
+  gap: 14px;
+}
+
+.form-foot {
+  margin-top: 22px;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+/* 6. FIELDS + INPUTS ------------------------------------------------------- */
+.field {
+  display: block;
+}
+
+.input-wrap {
+  position: relative;
+}
+.input-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.input-wrap input,
+.input-wrap select {
+  width: 100%;
+  height: 48px;
+  padding: 0 46px 0 44px;
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.2s ease;
+}
+.input-wrap input::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+.input-wrap input:hover,
+.input-wrap select:hover {
+  border-color: var(--text-muted);
+}
+.input-wrap input:focus,
+.input-wrap select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+/* Select: placeholder option shown in muted colour until a value is chosen */
+.input-wrap select {
+  cursor: pointer;
+}
+.input-wrap select:required:invalid {
+  color: var(--text-muted);
+}
+.input-wrap select option {
+  color: var(--text);
+  background: var(--surface);
+}
+.select-chevron {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+/* Show/hide password button */
+.icon-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.icon-btn:hover {
+  color: var(--text);
+  background: var(--border);
+}
+.icon-btn .i-eye-off {
+  display: none;
+}
+.icon-btn[aria-pressed="true"] .i-eye {
+  display: none;
+}
+.icon-btn[aria-pressed="true"] .i-eye-off {
+  display: block;
+}
+
+/* Validation states (border colour + message text, never colour alone) */
+.field.is-invalid .input-wrap input,
+.field.is-invalid .input-wrap select {
+  border-color: var(--danger);
+}
+.field.is-invalid .input-wrap input:focus,
+.field.is-invalid .input-wrap select:focus {
+  box-shadow: 0 0 0 3px var(--danger-bg);
+}
+.field.is-valid .input-wrap input,
+.field.is-valid .input-wrap select {
+  border-color: var(--success);
+}
+
+.field-error {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--danger);
+}
+.field-error:not(:empty) {
+  margin-top: 6px;
+}
+
+/* 7. CHECKBOX, LINKS, DIVIDER, ALERTS ------------------------------------- */
+.form-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.check input[type="checkbox"] {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  background-color: var(--surface-2);
+  border: 1.5px solid var(--text-muted);
+  border-radius: 5px;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.check input[type="checkbox"]:checked {
+  background-color: var(--primary);
+  border-color: var(--primary);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
+  background-size: 14px;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.check input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--ring-solid);
+  outline-offset: 2px;
+}
+.field.is-invalid .check input[type="checkbox"] {
+  border-color: var(--danger);
+}
+
+a,
+.link-btn {
+  color: var(--link);
+  font-weight: 500;
+  text-decoration: none;
+}
+a:hover,
+.link-btn:hover {
+  text-decoration: underline;
+}
+.link-btn {
+  padding: 0;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 2px 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.alert {
+  padding: 10px 12px;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  border: 1px solid;
+  border-radius: var(--radius-sm);
+}
+.alert--error {
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+}
+.alert--success {
+  color: var(--success);
+  background: var(--success-bg);
+  border-color: color-mix(in srgb, var(--success) 40%, transparent);
+}
+
+/* 8. BUTTONS --------------------------------------------------------------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  height: 48px;
+  padding: 0 20px;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.2s ease,
+    border-color 0.2s ease, opacity 0.15s ease;
+}
+.btn:hover {
+  text-decoration: none;
+}
+
+.btn-primary {
+  color: var(--on-primary);
+  background-image: linear-gradient(135deg, var(--primary), var(--primary-hover));
+  box-shadow: 0 10px 22px -10px rgba(79, 70, 229, 0.85);
+}
+.btn-primary:hover {
+  background-image: linear-gradient(135deg, var(--primary-hover), var(--primary-active));
+  transform: translateY(-1px);
+}
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-outline {
+  color: var(--text);
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+.btn-outline:hover {
+  border-color: var(--text-muted);
+}
+
+.btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-google-logo {
+  width: 20px;
+  height: 20px;
+}
+
+/* Loading spinner (shown while button has .is-loading) */
+.spinner {
+  display: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+.btn.is-loading .spinner {
+  display: inline-block;
+}
+.btn.is-loading .btn-google-logo {
+  display: none;
+}
+
+/* 9. PASSWORD STRENGTH + RULES -------------------------------------------- */
+.strength {
+  margin-top: 10px;
+}
+.strength-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.strength-bar span {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border);
+  transition: background-color 0.2s ease;
+}
+.strength[data-level="weak"] .strength-bar span:nth-child(-n + 1) {
+  background: var(--danger);
+}
+.strength[data-level="medium"] .strength-bar span:nth-child(-n + 2) {
+  background: var(--warning);
+}
+.strength[data-level="strong"] .strength-bar span {
+  background: var(--success);
+}
+.strength-label {
+  margin-top: 6px;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+.strength[data-level="weak"] strong {
+  color: var(--danger);
+}
+.strength[data-level="medium"] strong {
+  color: var(--warning);
+}
+.strength[data-level="strong"] strong {
+  color: var(--success);
+}
+
+.rules {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px 12px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+.rules li::before {
+  content: "○";
+  display: inline-block;
+  width: 1.4em;
+}
+.rules li.is-met {
+  color: var(--success);
+}
+.rules li.is-met::before {
+  content: "✓";
+  font-weight: 700;
+}
+
+/* 10. SUCCESS STATE -------------------------------------------------------- */
+.success-panel {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.success-icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 4px;
+  color: var(--success);
+  background: var(--success-bg);
+  border-radius: 50%;
+}
+.success-icon .icon {
+  width: 32px;
+  height: 32px;
+}
+.success-panel h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  outline: none;
+}
+.success-panel p {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+.success-panel p strong {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.success-panel .btn {
+  margin-top: 8px;
+}
+
+/* 11. THEME TOGGLE --------------------------------------------------------- */
+.theme-toggle {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.2s ease;
+}
+.theme-toggle:hover {
+  transform: scale(1.06);
+}
+.theme-toggle .i-sun {
+  display: none;
+}
+[data-theme="dark"] .theme-toggle .i-sun {
+  display: block;
+}
+[data-theme="dark"] .theme-toggle .i-moon {
+  display: none;
+}
+
+/* Smooth 200ms colour change, only while theme.js flags a manual toggle
+   (avoids animating on first paint). */
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease,
+    box-shadow 0.2s ease, fill 0.2s ease, stroke 0.2s ease !important;
+}
+
+/* 12. RESPONSIVE (mobile-first) ------------------------------------------- */
+@media (min-width: 480px) {
+  .rules {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (min-width: 768px) {
+  .auth-shell {
+    padding: 48px 24px;
+  }
+
+  .auth-card {
+    grid-template-columns: 45fr 55fr;
+    min-height: 640px;
+  }
+
+  .hero {
+    justify-content: flex-start;
+    gap: 6px;
+    min-height: 0;
+    padding: 40px 36px;
+    background-position: center;
+  }
+  .hero--register {
+    min-height: 0;
+  }
+  .hero-copy {
+    display: block;
+    margin-top: 48px;
+  }
+
+  .form-panel {
+    padding: 48px 44px;
+  }
+}
+
+/* 13. MOTION PREFERENCES --------------------------------------------------- */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+  }
+  .auth-card {
+    animation: none;
+  }
+  .btn-primary:hover,
+  .theme-toggle:hover {
+    transform: none;
+  }
+  /* Spinner pulses instead of rotating */
+  .spinner {
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+}

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Transmission tower at sunset (placeholder)">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e2a5a"/>
+      <stop offset="0.45" stop-color="#5a4a7a"/>
+      <stop offset="0.72" stop-color="#e07a4a"/>
+      <stop offset="0.86" stop-color="#f5b24a"/>
+      <stop offset="1" stop-color="#3b2a1f"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.3" cy="0.8" r="0.5">
+      <stop offset="0" stop-color="#ffd27a" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#ffd27a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="600" height="900" fill="url(#sky)"/>
+  <rect width="600" height="900" fill="url(#sun)"/>
+
+  <!-- distant hills / treeline -->
+  <path d="M0 800 Q80 770 160 790 T320 785 T480 795 T600 780 V900 H0Z" fill="#1d1a26"/>
+  <path d="M0 840 Q100 815 200 835 T400 830 T600 838 V900 H0Z" fill="#0f0e16"/>
+
+  <!-- palm silhouettes -->
+  <g fill="#0b0a10">
+    <path d="M520 840 Q522 760 530 700" stroke="#0b0a10" stroke-width="7" fill="none"/>
+    <path d="M530 700 q-50 -20 -80 10 q40 -10 80 0 q-30 -40 -70 -40 q50 10 70 40 q10 -50 50 -60 q-35 20 -50 60 q40 -25 80 -5 q-45 -5 -80 5z"/>
+  </g>
+
+  <!-- main tower -->
+  <g stroke="#0b0a10" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M300 250 L250 830 M300 250 L350 830"/>
+    <path d="M274 540 L326 540 M262 640 L338 640 M255 740 L345 740"/>
+    <path d="M300 250 L326 540 L262 640 L338 640 L255 740 L345 740"/>
+    <path d="M300 250 L274 540 L338 640 L262 640 L345 740 L255 740"/>
+    <path d="M170 330 L430 330 M215 275 L385 275 M240 380 L360 380"/>
+    <path d="M300 250 L300 205"/>
+    <path d="M205 330 L300 275 L395 330"/>
+  </g>
+  <!-- power lines -->
+  <g stroke="#0b0a10" stroke-width="2.5" fill="none">
+    <path d="M170 330 Q60 360 -20 345"/>
+    <path d="M215 275 Q100 310 -20 290"/>
+    <path d="M430 330 Q540 365 620 348"/>
+    <path d="M385 275 Q500 312 620 292"/>
+  </g>
+</svg>
