@@ -4,6 +4,7 @@ Defines the available user roles: Engineer (default) and Admin.
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.sql import func
 from app.db.base import Base
+from sqlalchemy.orm import relationship
 
 
 class Role(Base):
@@ -17,6 +18,7 @@ class Role(Base):
         server_default=func.now(),
         onupdate=func.now()
     )
+    users = relationship("AppUser", back_populates="role")
 
     def __repr__(self) -> str:
         return f"<Role(role_id={self.role_id}, role_name='{self.role_name}')>"
