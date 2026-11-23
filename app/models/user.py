@@ -5,6 +5,7 @@ All sensitive fields (NIC, employee_id) are hashed before storage.
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey
 from sqlalchemy.sql import func
 from app.db.base import Base
+from sqlalchemy.orm import relationship
 
 
 class AppUser(Base):
@@ -26,7 +27,7 @@ class AppUser(Base):
     )
 
     # Relationship to roles
-    role = None  # Will be set relationally
+    role = relationship("Role", back_populates="users")
 
     def __repr__(self) -> str:
         return f"<AppUser(id={self.id}, email={self.email}, firebase_uid={self.firebase_uid[:8]}...)>"

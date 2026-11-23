@@ -1,27 +1,4 @@
-/* ==========================================================================
-   auth.js – Firebase authentication for LankaGrid
-   --------------------------------------------------------------------------
-   Exports used by the UI (login.js / register.js):
-     handleLogin(email, password, remember)
-     handleRegister({ name, email, password, role })
-     handleGoogle()
-     handleForgotPassword(email)
-   Also exports `auth` and `db` so other pages (e.g. a dashboard guard) can
-   import them from this one file.
-
-   Contract used by login.js / register.js:
-     - resolve  -> success (optionally { redirectTo: 'dashboard.html' })
-     - throw    -> new Error('Friendly message to show the user')
-
-   Security notes:
-     - New profiles use only ALLOWED_ROLES; missing or invalid selections
-       default to 'viewer'. Firestore rules enforce the same allowlist.
-     - Roles selected by users should not grant privileges unless that
-       self-assignment is intentional.
-     - Raw Firebase error text is never shown; codes are mapped to friendly
-       messages, and failed logins use one generic message.
-     - Passwords are never logged or stored.
-   ========================================================================== */
+/* Firebase Authentication plus the FastAPI/PostgreSQL profile API. */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
 import {
@@ -39,27 +16,16 @@ import {
   browserSessionPersistence,
   signOut,
 } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
-import {
-  getFirestore,
-  doc,
-  getDoc,
-  setDoc,
-  serverTimestamp,
-} from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 
-/** Demo notices are off now that Firebase is connected. */
 export const DEMO_MODE = false;
-
-const ALLOWED_ROLES = ["grid-operator", "engineer", "analyst", "viewer"];
-
-/**
- * Where to send users after a successful login.
- */
 const AFTER_LOGIN_URL = "dashboard.html";
 
-/* ----------------------------------------------------------- FIREBASE --- */
-// The web apiKey is not a secret: access is controlled by your Firebase
-// security rules and the authorized domains list, not by hiding this config.
+// Override before module scripts load with window.LANKAGRID_API_BASE_URL if needed.
+const API_BASE_URL = (
+  window.LANKAGRID_API_BASE_URL || "http://127.0.0.1:8000"
+).replace(/\/+$/, "");
+const AUTH_API_URL = API_BASE_URL + "/api/v1/auth";
+
 const firebaseConfig = {
   apiKey: "AIzaSyCakTBGeKbwDin92DaLZl-5Y8drePPhsgI",
   authDomain: "smart-electrical-grid-ee080.firebaseapp.com",
@@ -72,12 +38,8 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
 export { onAuthStateChanged, signOut };
 
-/* ------------------------------------------------------------- HELPERS --- */
-
-/** Map Firebase error codes to messages that are safe to show users. */
 function friendlyMessage(code) {
   switch (code) {
     case "auth/email-already-in-use":
@@ -90,7 +52,7 @@ function friendlyMessage(code) {
     case "auth/invalid-login-credentials":
     case "auth/wrong-password":
     case "auth/user-not-found":
-      return "Incorrect email or password."; // generic on purpose
+      return "Incorrect email or password.";
     case "auth/user-disabled":
       return "This account has been disabled. Please contact your administrator.";
     case "auth/too-many-requests":
@@ -105,107 +67,147 @@ function friendlyMessage(code) {
     case "auth/operation-not-allowed":
       return "This sign-in method is not enabled yet. Please contact your administrator.";
     case "auth/unauthorized-domain":
-      return "This domain is not authorized for sign-in. Add it under Firebase > Authentication > Settings > Authorized domains.";
+      return "This domain is not authorized for sign-in. Add it under Firebase Authentication authorized domains.";
     default:
       return "Something went wrong. Please try again.";
   }
 }
 
-const toFriendlyError = (err) => new Error(friendlyMessage(err && err.code));
+const toFriendlyError = (error) => new Error(friendlyMessage(error && error.code));
 
-/**
- * Create users/{uid} if it does not exist yet. Never throws: a missing profile
- * must not block registration or login (it is retried on the next login).
- * Saves only an allowed role; missing or invalid selections default to viewer.
- */
-async function ensureUserProfile(user, extra = {}) {
+async function requestAuthApi(endpoint, options = {}) {
+  const headers = {};
+  if (options.body) headers["Content-Type"] = "application/json";
+  if (options.token) headers.Authorization = "Bearer " + options.token;
+
+  let response;
   try {
-    const ref = doc(db, "users", user.uid);
-    const snap = await getDoc(ref);
-    if (snap.exists()) return;
-
-    const role = ALLOWED_ROLES.includes(extra.role)
-      ? extra.role
-      : "viewer";
-
-    await setDoc(ref, {
-      name: extra.name || user.displayName || "",
-      email: user.email, // use Firebase's normalised (lowercase) email
-      role,
-      createdAt: serverTimestamp(),
+    response = await fetch(AUTH_API_URL + endpoint, {
+      method: options.method || "GET",
+      headers,
+      body: options.body ? JSON.stringify(options.body) : undefined,
     });
-  } catch (err) {
-    console.warn("User profile was not saved:", (err && err.code) || "unknown error");
+  } catch (error) {
+    throw new Error(
+      "Could not reach the LankaGrid API at " + API_BASE_URL +
+      ". Make sure FastAPI is running and the frontend API URL is correct."
+    );
+  }
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    let message = data.detail || data.message || "The API request failed.";
+    if (Array.isArray(message)) {
+      message = message.map((item) => item.msg || "Invalid input").join(" ");
+    }
+    if (response.status === 401 && String(message).toLowerCase().includes("profile")) {
+      message = "No application profile was found for this account. Please register first.";
+    }
+    throw new Error(String(message));
+  }
+  return data;
+}
+
+async function validateBackendLogin(user) {
+  try {
+    const idToken = await user.getIdToken();
+    return await requestAuthApi("/login", {
+      method: "POST",
+      body: { firebase_id_token: idToken },
+    });
+  } catch (error) {
+    await signOut(auth).catch(() => {});
+    throw error;
   }
 }
 
-/* ---------------------------------------------------------------- LOGIN --- */
-/** Sign in with email + password. Blocks accounts whose email is unverified. */
+/** Email/password sign-in, followed by PostgreSQL profile validation. */
 export async function handleLogin(email, password, remember) {
   let user;
   try {
-    // "Remember me" -> stay signed in across browser restarts; otherwise
-    // only for this tab/session.
-    await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
+    await setPersistence(
+      auth,
+      remember ? browserLocalPersistence : browserSessionPersistence
+    );
     ({ user } = await signInWithEmailAndPassword(auth, email, password));
-  } catch (err) {
-    throw toFriendlyError(err);
+  } catch (error) {
+    throw toFriendlyError(error);
   }
 
   if (!user.emailVerified) {
     await signOut(auth).catch(() => {});
     throw new Error(
-      "Please verify your email before signing in. Check your inbox (and spam folder) for the verification link."
+      "Please verify your email before signing in. Check your inbox and spam folder."
     );
   }
 
-  await ensureUserProfile(user);
+  await validateBackendLogin(user);
   return { redirectTo: AFTER_LOGIN_URL };
 }
 
-/* ------------------------------------------------------------- REGISTER --- */
 /**
- * Create an account, send the verification email, then sign out so the user
- * must verify before their first login.
- * @param {{name:string,email:string,password:string,role:string}} data
+ * Create the Firebase account, then create its PostgreSQL application profile.
+ * Passwords remain exclusively in Firebase Authentication.
  */
-export async function handleRegister({ name, email, password, role }) {
-  let cred;
+export async function handleRegister({ name, email, password, nic, employeeId }) {
+  let credential;
   try {
-    cred = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(cred.user, { displayName: name });
-    await sendEmailVerification(cred.user);
-  } catch (err) {
-    throw toFriendlyError(err);
-  }
+    credential = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(credential.user, { displayName: name });
 
-  await ensureUserProfile(cred.user, { name, role });
-  await signOut(auth).catch(() => {});
-  return {};
+    const idToken = await credential.user.getIdToken();
+    await requestAuthApi("/register", {
+      method: "POST",
+      body: {
+        email: credential.user.email,
+        fullname: name,
+        nic,
+        employee_id: employeeId,
+        firebase_id_token: idToken,
+      },
+    });
+
+    await sendEmailVerification(credential.user);
+    await signOut(auth);
+    return {};
+  } catch (error) {
+    await signOut(auth).catch(() => {});
+    if (error && error.code) throw toFriendlyError(error);
+    throw error;
+  }
 }
 
-/* --------------------------------------------------------------- GOOGLE --- */
-/** Continue with Google (accounts arrive already verified). */
+/** Google sign-in is accepted only for accounts that already have a DB profile. */
 export async function handleGoogle() {
   let user;
   try {
     ({ user } = await signInWithPopup(auth, new GoogleAuthProvider()));
-  } catch (err) {
-    throw toFriendlyError(err);
+  } catch (error) {
+    throw toFriendlyError(error);
   }
 
-  await ensureUserProfile(user);
+  if (!user.emailVerified) {
+    await signOut(auth).catch(() => {});
+    throw new Error("Verify your email address before signing in.");
+  }
+
+  await validateBackendLogin(user);
   return { redirectTo: AFTER_LOGIN_URL };
 }
 
-/* ------------------------------------------------------ FORGOT PASSWORD --- */
+/** Load the authoritative user profile from FastAPI/PostgreSQL. */
+export async function getCurrentUserProfile(user) {
+  const idToken = await user.getIdToken();
+  return requestAuthApi("/me", { token: idToken });
+}
+
 /** Send a password-reset email without revealing whether the account exists. */
 export async function handleForgotPassword(email) {
   try {
     await sendPasswordResetEmail(auth, email);
-  } catch (err) {
-    if (err && err.code === "auth/user-not-found") return {}; // don't reveal
-    throw toFriendlyError(err);
+  } catch (error) {
+    if (error && error.code === "auth/user-not-found") return {};
+    throw toFriendlyError(error);
   }
   return {};
 }

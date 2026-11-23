@@ -1,117 +1,95 @@
-/* ==========================================================================
-   ui.js – validation + UI helpers shared by login.js and register.js
-   No backend logic here. Never log or store passwords in this file.
-   ========================================================================== */
-
-/* ---------- Validation rules ---------- */
+/* Shared validation and UI helpers. No backend logic or password storage. */
 
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export const PASSWORD_RULES = [
-  { id: 'length', test: (v) => v.length >= 8 },
-  { id: 'upper',  test: (v) => /[A-Z]/.test(v) },
-  { id: 'lower',  test: (v) => /[a-z]/.test(v) },
-  { id: 'number', test: (v) => /\d/.test(v) },
-  { id: 'symbol', test: (v) => /[^A-Za-z0-9]/.test(v) },
+  { id: "length", test: (value) => value.length >= 8 },
+  { id: "upper", test: (value) => /[A-Z]/.test(value) },
+  { id: "lower", test: (value) => /[a-z]/.test(value) },
+  { id: "number", test: (value) => /\d/.test(value) },
+  { id: "symbol", test: (value) => /[^A-Za-z0-9]/.test(value) },
 ];
 
-/**
- * Field validators. Each takes (element, form) and returns an error message,
- * or an empty string when the field is valid.
- */
 export const validators = {
-  email(el) {
-    const v = el.value.trim();
-    if (!v) return 'Enter your email address.';
-    return EMAIL_RE.test(v) ? '' : 'Enter a valid email address.';
+  email(element) {
+    const value = element.value.trim();
+    if (!value) return "Enter your email address.";
+    return EMAIL_RE.test(value) ? "" : "Enter a valid email address.";
   },
-
-  /** Login only needs "not empty"; the strength rules apply on registration. */
-  passwordRequired(el) {
-    return el.value ? '' : 'Enter your password.';
+  passwordRequired(element) {
+    return element.value ? "" : "Enter your password.";
   },
-
-  fullName(el) {
-    const v = el.value.trim();
-    if (!v) return 'Enter your full name.';
-    return v.length >= 2 ? '' : 'Name must be at least 2 characters.';
+  fullName(element) {
+    const value = element.value.trim();
+    if (!value) return "Enter your full name.";
+    return value.length >= 2 ? "" : "Name must be at least 2 characters.";
   },
-
-  newPassword(el) {
-    if (!el.value) return 'Create a password.';
-    return PASSWORD_RULES.every((r) => r.test(el.value))
-      ? ''
-      : 'Password must meet all the requirements below.';
+  nic(element) {
+    const value = element.value.trim();
+    if (!value) return "Enter your NIC number.";
+    return value.length >= 5 && value.length <= 20 ? "" : "Enter a valid NIC number.";
   },
-
-  confirmPassword(el, form) {
-    if (!el.value) return 'Confirm your password.';
-    return el.value === form.elements.password.value ? '' : 'Passwords do not match.';
+  employeeId(element) {
+    const value = element.value.trim();
+    if (!value) return "Enter your employee ID.";
+    return value.length <= 50 ? "" : "Employee ID must be 50 characters or fewer.";
   },
-
-  role(el) {
-    return el.value ? '' : 'Select a role.';
+  newPassword(element) {
+    if (!element.value) return "Create a password.";
+    return PASSWORD_RULES.every((rule) => rule.test(element.value))
+      ? ""
+      : "Password must meet all the requirements below.";
   },
-
-  terms(el) {
-    return el.checked ? '' : 'You must accept the Terms of Service and Privacy Policy.';
+  confirmPassword(element, form) {
+    if (!element.value) return "Confirm your password.";
+    return element.value === form.elements.password.value ? "" : "Passwords do not match.";
+  },
+  terms(element) {
+    return element.checked ? "" : "You must accept the Terms of Service and Privacy Policy.";
   },
 };
 
-/* ---------- Field state ---------- */
-
-/** Show (message) or clear ('') the validation state of a single control. */
-export function setFieldState(el, message) {
-  const field = el.closest('.field');
-  const errorEl = field && field.querySelector('.field-error');
-  if (!field || !errorEl) return;
-
+export function setFieldState(element, message) {
+  const field = element.closest(".field");
+  const errorElement = field && field.querySelector(".field-error");
+  if (!field || !errorElement) return;
   if (message) {
-    field.classList.add('is-invalid');
-    field.classList.remove('is-valid');
-    el.setAttribute('aria-invalid', 'true');
-    errorEl.textContent = message;
+    field.classList.add("is-invalid");
+    field.classList.remove("is-valid");
+    element.setAttribute("aria-invalid", "true");
+    errorElement.textContent = message;
   } else {
-    field.classList.remove('is-invalid');
-    const hasValue = el.type === 'checkbox' ? false : el.value.trim() !== '';
-    field.classList.toggle('is-valid', hasValue);
-    el.removeAttribute('aria-invalid');
-    errorEl.textContent = '';
+    field.classList.remove("is-invalid");
+    const hasValue = element.type === "checkbox" ? false : element.value.trim() !== "";
+    field.classList.toggle("is-valid", hasValue);
+    element.removeAttribute("aria-invalid");
+    errorElement.textContent = "";
   }
 }
 
-/**
- * Wire inline validation to a form.
- *  - schema: { fieldName: validatorFn }
- *  - links:  { fieldName: [otherFields to re-check when it changes] }
- * Validates on blur; after a field has been touched it re-validates live.
- * Returns { validate() } where validate() checks everything, focuses the
- * first invalid control and returns true/false.
- */
 export function bindValidation(form, schema, links = {}) {
   const touched = new Set();
   const names = Object.keys(schema);
-
   const run = (name) => {
-    const el = form.elements[name];
-    const message = schema[name](el, form);
-    setFieldState(el, message);
+    const element = form.elements[name];
+    const message = schema[name](element, form);
+    setFieldState(element, message);
     return !message;
   };
 
   names.forEach((name) => {
-    const el = form.elements[name];
-    const discrete = el.type === 'checkbox' || el.tagName === 'SELECT';
-
-    el.addEventListener('blur', () => {
+    const element = form.elements[name];
+    const discrete = element.type === "checkbox" || element.tagName === "SELECT";
+    element.addEventListener("blur", () => {
       touched.add(name);
       run(name);
     });
-
-    el.addEventListener(discrete ? 'change' : 'input', () => {
+    element.addEventListener(discrete ? "change" : "input", () => {
       if (discrete) touched.add(name);
       if (touched.has(name)) run(name);
-      (links[name] || []).forEach((dep) => touched.has(dep) && run(dep));
+      (links[name] || []).forEach((dependency) => {
+        if (touched.has(dependency)) run(dependency);
+      });
     });
   });
 
@@ -128,78 +106,60 @@ export function bindValidation(form, schema, links = {}) {
   };
 }
 
-/* ---------- Buttons + alerts ---------- */
-
-/** Toggle the loading state (disables the button and shows the spinner). */
-export function setLoading(btn, isLoading, loadingText) {
-  const label = btn.querySelector('.btn-label');
-  if (label && !btn.dataset.label) btn.dataset.label = label.textContent;
-
-  btn.disabled = isLoading;
-  btn.classList.toggle('is-loading', isLoading);
-  btn.setAttribute('aria-busy', String(isLoading));
-
-  if (label && loadingText) {
-    label.textContent = isLoading ? loadingText : btn.dataset.label;
-  }
+export function setLoading(button, isLoading, loadingText) {
+  const label = button.querySelector(".btn-label");
+  if (label && !button.dataset.label) button.dataset.label = label.textContent;
+  button.disabled = isLoading;
+  button.classList.toggle("is-loading", isLoading);
+  button.setAttribute("aria-busy", String(isLoading));
+  if (label && loadingText) label.textContent = isLoading ? loadingText : button.dataset.label;
 }
 
-/** Show a form-level message. type: 'error' | 'success' */
-export function showAlert(el, type, message) {
-  el.className = `alert alert--${type}`;
-  el.textContent = message; // textContent (never innerHTML) – safe for any text
-  el.hidden = false;
+export function showAlert(element, type, message) {
+  element.className = "alert alert--" + type;
+  element.textContent = message;
+  element.hidden = false;
 }
 
-export function hideAlert(el) {
-  el.hidden = true;
-  el.textContent = '';
+export function hideAlert(element) {
+  element.hidden = true;
+  element.textContent = "";
 }
 
-/* ---------- Password helpers ---------- */
-
-/** Show / hide password buttons: <button data-toggle-password="inputId"> */
 export function initPasswordToggles(root = document) {
-  root.querySelectorAll('[data-toggle-password]').forEach((btn) => {
-    const input = document.getElementById(btn.dataset.togglePassword);
+  root.querySelectorAll("[data-toggle-password]").forEach((button) => {
+    const input = document.getElementById(button.dataset.togglePassword);
     if (!input) return;
-    btn.addEventListener('click', () => {
-      const show = input.type === 'password';
-      input.type = show ? 'text' : 'password';
-      btn.setAttribute('aria-pressed', String(show));
+    button.addEventListener("click", () => {
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      button.setAttribute("aria-pressed", String(show));
     });
   });
 }
 
-/** Strength meter + rules checklist for the register password field. */
 export function initPasswordStrength({ input, meter, textEl, rulesList }) {
-  const WORDS = { none: '—', weak: 'Weak', medium: 'Medium', strong: 'Strong' };
-
+  const words = { none: "—", weak: "Weak", medium: "Medium", strong: "Strong" };
   const update = () => {
-    const value = input.value;
-    const results = PASSWORD_RULES.map((r) => r.test(value));
+    const results = PASSWORD_RULES.map((rule) => rule.test(input.value));
     const score = results.filter(Boolean).length;
-
-    let level = 'none';
-    if (value) {
-      if (!results[0]) level = 'weak';          // under 8 chars is always weak
-      else if (score === PASSWORD_RULES.length) level = 'strong';
-      else if (score >= 3) level = 'medium';
-      else level = 'weak';
+    let level = "none";
+    if (input.value) {
+      if (!results[0]) level = "weak";
+      else if (score === PASSWORD_RULES.length) level = "strong";
+      else if (score >= 3) level = "medium";
+      else level = "weak";
     }
-
     meter.dataset.level = level;
-    if (textEl.textContent !== WORDS[level]) textEl.textContent = WORDS[level];
-
-    PASSWORD_RULES.forEach((rule, i) => {
-      const li = rulesList.querySelector(`[data-rule="${rule.id}"]`);
-      if (!li) return;
-      li.classList.toggle('is-met', results[i]);
-      const status = li.querySelector('[data-status]');
-      if (status) status.textContent = results[i] ? ' (met)' : ' (not met)';
+    textEl.textContent = words[level];
+    PASSWORD_RULES.forEach((rule, index) => {
+      const item = rulesList.querySelector('[data-rule="' + rule.id + '"]');
+      if (!item) return;
+      item.classList.toggle("is-met", results[index]);
+      const status = item.querySelector("[data-status]");
+      if (status) status.textContent = results[index] ? " (met)" : " (not met)";
     });
   };
-
-  input.addEventListener('input', update);
+  input.addEventListener("input", update);
   update();
 }

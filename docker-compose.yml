@@ -1,3 +1,5 @@
+name: backend
+
 services:
   db:
     image: timescale/timescaledb:2.31.0-pg18
@@ -8,9 +10,11 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Missing POSTGRES_PASSWORD}
     ports:
-      - "5433:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - timescale_data:/var/lib/postgresql
 
 volumes:
   timescale_data:
+    external: true
+    name: backend_timescale_data

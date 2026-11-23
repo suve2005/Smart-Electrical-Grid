@@ -3,6 +3,7 @@
 .env
 __pycache__/
 *.py[cod]
-
-
 uv.lock
+firebase-service-account*.json
+service-account*.json
+*.pem
