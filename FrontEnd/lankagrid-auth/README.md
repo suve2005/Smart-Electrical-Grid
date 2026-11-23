@@ -1,26 +1,34 @@
 # LankaGrid – Authentication UI
 
-Plain HTML, CSS and vanilla JS. No frameworks, no build step.
+Plain HTML, CSS and vanilla JavaScript. No framework or build step is required.
 
 ## Run it
-ES modules do not load from `file://`, so serve the folder over HTTP:
-- VS Code: right-click `index.html` -> "Open with Live Server", or
-- Terminal: `python3 -m http.server 8000` then open http://localhost:8000
+
+Serve this folder over HTTP; ES modules do not load from file://. Use VS Code Live Server (normally http://127.0.0.1:5500) and ensure FastAPI is running at http://127.0.0.1:8000.
+
+## Authentication and profiles
+
+- Firebase Authentication handles email/password and Google identity.
+- The browser sends the Firebase ID token to FastAPI.
+- FastAPI verifies the token with the Firebase Admin SDK.
+- PostgreSQL is the only source of application profile data.
+- Firestore is not used for user profiles.
+- New profiles are assigned the Engineer role by the backend. Users cannot grant themselves the Admin role.
+- NIC and employee ID are sent only to the registration endpoint; FastAPI stores salted PBKDF2 hashes. Passwords remain in Firebase Authentication.
+
+The backend API defaults to http://127.0.0.1:8000. To override it, set window.LANKAGRID_API_BASE_URL before the page's module scripts load. The backend CORS_ORIGINS setting must include the frontend origin.
 
 ## Structure
-index.html       login page (markup only)
-register.html    registration page (markup only)
-dashboard.html   authenticated dashboard (protected by js/guard.js)
-css/styles.css   design tokens (light/dark), layout, components
-js/theme.js      dark/light toggle (persisted, follows OS until changed)
-js/ui.js         validation, password strength, show/hide password, alerts
-js/auth.js       Firebase initialization and authentication functions
-js/login.js      connects index.html to ui.js + auth.js
-js/register.js   connects register.html to ui.js + auth.js
-js/guard.js      redirects unauthenticated or unverified dashboard visitors
-js/dashboard.js  loads the Firestore profile and handles sign-out
-assets/          logo + placeholder hero art (replace with real photos)
 
-New email/password accounts must verify their email before signing in. The
-dashboard displays the profile stored at `users/{uid}`; account roles are
-assigned server-side, and new profiles default to `viewer`.
+index.html       Login page
+register.html    Registration page
+dashboard.html  Authenticated dashboard
+css/styles.css   Theme, layout and components
+js/theme.js      Theme toggle
+js/ui.js         Form validation and UI helpers
+js/auth.js       Firebase auth and FastAPI API client
+js/login.js      Login page controller
+js/register.js   Registration page controller
+js/guard.js      Firebase-authenticated page guard
+js/dashboard.js  Loads the PostgreSQL profile through FastAPI
+assets/          Logo and illustration assets

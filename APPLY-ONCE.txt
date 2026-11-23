@@ -1,0 +1,13 @@
+LANKAGRID INTEGRATION PATCH
+
+This archive contains only the files changed for Firebase -> FastAPI -> PostgreSQL authentication/profile integration.
+It does not contain .env, .venv, database files, Git metadata, or Firebase service-account credentials.
+
+Apply it by extracting this ZIP into the root of your Smart-Electrical-Grid checkout and allowing the listed files to be replaced.
+
+After extraction:
+1. Keep your existing local .env. Add FIREBASE_SERVICE_ACCOUNT_PATH=./firebase-service-account.json if it is not already configured.
+2. Place the Firebase Admin service-account JSON for the same Firebase project at that path. Never commit that JSON file. Alternatively configure Google Application Default Credentials.
+3. Your existing POSTGRES_* settings remain in your local .env. The development CORS defaults include the usual VS Code Live Server port 5500.
+
+No database migration is included or required by this integration patch. It uses the existing app_users and roles schema and existing role relationship.
