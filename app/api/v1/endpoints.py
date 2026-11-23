@@ -8,13 +8,15 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.v1.schemas import (
+    APIError,
     AuthResponse,
+    ErrorResponse,
     LoginRequest,
-    LogoutRequest,
     LogoutResponse,
     RefreshRequest,
     RegisterRequest,
     RoleResponse,
+    UserStatusUpdate,
     UserResponse,
 )
 from app.core.deps import get_current_user, require_admin, verify_firebase_token
@@ -68,7 +70,7 @@ def _find_active_profile(db: Session, claims: dict) -> AppUser:
     if user.email.casefold() != claims["email"].casefold():
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="The Firebase account does not match the application profile.",
+            detail="Incorrect email",
         )
     return user
 
@@ -77,9 +79,9 @@ def _find_active_profile(db: Session, claims: dict) -> AppUser:
     "/register",
     response_model=AuthResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Create a PostgreSQL profile for a Firebase account",
+    summary="Create Account",
 )
-async def register(request: RegisterRequest, db: Session = Depends(get_db)) -> AuthResponse:
+def register(request: RegisterRequest, db: Session = Depends(get_db)) -> AuthResponse:
     """Verify the newly-created Firebase account and persist its profile."""
     claims = verify_firebase_token(request.firebase_id_token)
     firebase_uid = claims["uid"]
@@ -88,7 +90,9 @@ async def register(request: RegisterRequest, db: Session = Depends(get_db)) -> A
     if request.email.strip().casefold() != token_email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="The submitted email does not match the Firebase account.",
+            detail=ErrorResponse(
+                error=APIError(error="VALIDATION_ERROR", message="Invalid email"),
+            ).model_dump(),
         )
 
     existing_user = db.query(AppUser).filter(
@@ -97,14 +101,16 @@ async def register(request: RegisterRequest, db: Session = Depends(get_db)) -> A
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="An application profile already exists for this Firebase account or email.",
+            detail=ErrorResponse(
+                error=APIError(error="CONFLICT", message="Try New password or email"),
+            ).model_dump(),
         )
 
-    role = db.query(Role).filter(Role.role_name == "Engineer").first()
+    # The "Engineer" role is seeded by migration bb7d2bbe903c_initial_application_schema.py
+    role = db.query(Role).filter(Role.role_name == "Engineer").one_or_none()
     if role is None:
-        role = Role(role_name="Engineer")
-        db.add(role)
-        db.flush()
+        logger.critical("Engineer role not found - database migration may not have been applied")
+        raise RuntimeError("Engineer role not found in database. Please run database migrations.")
 
     new_user = AppUser(
         firebase_uid=firebase_uid,
@@ -124,7 +130,7 @@ async def register(request: RegisterRequest, db: Session = Depends(get_db)) -> A
         logger.warning("Duplicate profile registration rejected", firebase_uid=firebase_uid)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="An application profile already exists for this Firebase account or email.",
+            detail="Try New password or email.",
         ) from exc
 
     logger.info("Application profile created", firebase_uid=firebase_uid, email=token_email)
@@ -132,7 +138,7 @@ async def register(request: RegisterRequest, db: Session = Depends(get_db)) -> A
 
 
 @router.post("/login", response_model=AuthResponse, summary="Validate login against PostgreSQL")
-async def login(request: LoginRequest, db: Session = Depends(get_db)) -> AuthResponse:
+def login(request: LoginRequest, db: Session = Depends(get_db)) -> AuthResponse:
     claims = verify_firebase_token(request.firebase_id_token)
     _require_verified_email(claims)
     user = _find_active_profile(db, claims)
@@ -141,26 +147,26 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)) -> AuthRes
 
 
 @router.post("/refresh", response_model=AuthResponse, summary="Refresh the Firebase-backed profile session")
-async def refresh(request: RefreshRequest, db: Session = Depends(get_db)) -> AuthResponse:
+def refresh(request: RefreshRequest, db: Session = Depends(get_db)) -> AuthResponse:
     claims = verify_firebase_token(request.firebase_id_token)
     _require_verified_email(claims)
     return _auth_response(_find_active_profile(db, claims))
 
 
 @router.post("/logout", response_model=LogoutResponse, summary="Client-side Firebase logout acknowledgement")
-async def logout(request: LogoutRequest) -> LogoutResponse:
+async def logout() -> LogoutResponse:
     # Firebase signOut() runs in the browser. This route does not revoke all
     # Firebase refresh tokens and therefore must not claim that it did.
     return LogoutResponse()
 
 
 @router.get("/me", response_model=UserResponse, summary="Get the current PostgreSQL profile")
-async def me(current_user: AppUser = Depends(get_current_user)) -> UserResponse:
+def me(current_user: AppUser = Depends(get_current_user)) -> UserResponse:
     return _user_response(current_user)
 
 
 @router.get("/users", response_model=List[UserResponse], summary="List users (Admin only)")
-async def list_users(
+def list_users(
     db: Session = Depends(get_db),
     _admin: AppUser = Depends(require_admin),
 ) -> List[UserResponse]:
@@ -169,7 +175,7 @@ async def list_users(
 
 
 @router.get("/users/{user_id}", response_model=UserResponse, summary="Get a user (Admin only)")
-async def get_user(
+def get_user(
     user_id: int,
     db: Session = Depends(get_db),
     _admin: AppUser = Depends(require_admin),
@@ -181,7 +187,7 @@ async def get_user(
 
 
 @router.patch("/users/{user_id}/role", response_model=UserResponse, summary="Change user role (Admin only)")
-async def change_user_role(
+def change_user_role(
     user_id: int,
     new_role_name: str = Query(..., min_length=1),
     db: Session = Depends(get_db),
@@ -208,9 +214,9 @@ async def change_user_role(
 
 
 @router.patch("/users/{user_id}/status", response_model=UserResponse, summary="Change user status (Admin only)")
-async def change_user_status(
+def change_user_status(
     user_id: int,
-    is_active: bool,
+    status_update: UserStatusUpdate,
     db: Session = Depends(get_db),
     _admin: AppUser = Depends(require_admin),
 ) -> UserResponse:
@@ -218,7 +224,15 @@ async def change_user_status(
     if target_user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
 
-    target_user.is_active = is_active
+    if target_user.id == _admin.id and not status_update.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ErrorResponse(
+                error=APIError(error="VALIDATION_ERROR", message="Administrators cannot deactivate their own account."),
+            ).model_dump(),
+        )
+
+    target_user.is_active = status_update.is_active
     db.commit()
     db.refresh(target_user)
     return _user_response(target_user)

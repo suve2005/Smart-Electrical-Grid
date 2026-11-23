@@ -55,7 +55,18 @@ class LogoutRequest(BaseModel):
     firebase_id_token: str = Field(..., min_length=1)
 
 
+class UserStatusUpdate(BaseModel):
+    """Request body for PATCH /users/{user_id}/status endpoint."""
+    is_active: bool
+
+
+class APIError(BaseModel):
+    """Standardized error response format following the contract-first principle."""
+    error: str  # Machine-readable error code (e.g. "VALIDATION_ERROR", "NOT_FOUND")
+    message: str  # Human-readable explanation
+    details: Optional[dict] = None  # Additional context when helpful
+
+
 class ErrorResponse(BaseModel):
-    error: str
-    message: str
-    details: Optional[dict] = None
+    """Wrapper for standardized API error responses."""
+    error: APIError

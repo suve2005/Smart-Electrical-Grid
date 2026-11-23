@@ -11,6 +11,7 @@ from firebase_admin.exceptions import FirebaseError
 from sqlalchemy.orm import Session
 
 from app.core.config import BASE_DIR, FIREBASE_PROJECT_ID, FIREBASE_SERVICE_ACCOUNT_PATH
+from app.core.validation import sanitize_email, verify_email_match
 from app.db.session import get_db
 from app.models.user import AppUser
 
@@ -109,7 +110,7 @@ def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Your application account has been deactivated.",
         )
-    if user.email.casefold() != claims["email"].casefold():
+    if not verify_email_match(claims["email"], user.email):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="The Firebase account does not match the application profile.",

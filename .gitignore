@@ -7,3 +7,9 @@ uv.lock
 firebase-service-account*.json
 service-account*.json
 *.pem
+.claude
+agents
+references
+scripts
+skills
+templates
